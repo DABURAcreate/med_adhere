@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
-class ReminderSettingsScreen extends StatelessWidget {
-  const ReminderSettingsScreen({super.key});
+class DashboardScreen extends StatelessWidget {
+  const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reminder Settings')),
+      appBar: AppBar(title: const Text('Dashboard')),
       body: const Center(
         child: Text(
-          'Reminder Settings Screen\n(Ghost placeholder)',
+          'Dashboard Screen\n(Ghost placeholder)',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 20),
         ),

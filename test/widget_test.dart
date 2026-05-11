@@ -7,6 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mzansi_meds_reminder/app/app.dart';
 
 import 'package:mzansi_meds_reminder/main.dart';
 
