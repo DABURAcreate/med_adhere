@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/router.dart';
+
 // ── Colour palette (mirrors patient_list_screen) ──────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
 const kP2 = Color(0xFF114C90);
@@ -898,6 +900,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           onTap: () => context.push(
             '/worker/patients/${widget.patientId}/schedule',
           ),
+        ),
+        const SizedBox(height: 10),
+        _actionButton(
+          icon: Icons.people_rounded,
+          label: 'Manage Caregiver',
+          color: kP4,
+          onTap: () => context.push(AppRoutes.caregiverLink),
         ),
       ],
     ),

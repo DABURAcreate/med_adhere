@@ -62,7 +62,7 @@ class AppRoutes {
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.dashboard,
+    initialLocation: AppRoutes.language,
     debugLogDiagnostics: true,
     routes: [
       // ---------- Auth / Shared ----------
