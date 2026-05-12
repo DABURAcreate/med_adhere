@@ -5,8 +5,8 @@ import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
 import '../widgets/pin_input_row.dart';
 
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
+class RegistrationCodeScreen extends StatelessWidget {
+  const RegistrationCodeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,10 +19,11 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const MedAdhereHeader(),
+
               const SizedBox(height: 56),
 
               const Text(
-                'Enter Your Pin:',
+                'Enter Registration Code',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -33,16 +34,15 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 56),
 
               PinInputRow(
-                length: 4,
-                isObscured: true,
-                // boxSize and boxSpacing use defaults (70, 15)
-                onCompleted: (pin) {
-                  // TODO: validate pin against database
-                  debugPrint('PIN entered: $pin');
+                length: 5,
+                boxSize: 50,
+                boxSpacing: 14,
+                onCompleted: (code) {
+                  debugPrint('Entered code: $code');
                 },
               ),
 
-              const SizedBox(height: 33),
+              const SizedBox(height: 53),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -50,7 +50,7 @@ class LoginScreen extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: ContinueButton(
                     onPressed: () {
-                      context.go('/patient/home');
+                      context.go('/patient/home/calendar');
                     },
                   ),
                 ),

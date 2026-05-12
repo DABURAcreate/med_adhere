@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/pin_setup_screen.dart';
 import '../features/auth/presentation/language_screen.dart';
+import '../features/auth/presentation/registration_code_screen.dart';
 
 // Patient
 import '../features/patient/presentation/home_screen.dart';
@@ -18,6 +19,7 @@ import '../features/reminders/presentation/reminder_settings_screen.dart';
 // Worker — Dashboard
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/dashboard/presentation/patient_list_screen.dart';
+
 
 // Worker — Patient Management
 import '../features/patient_management/presentation/register_patient_screen.dart';
@@ -36,6 +38,7 @@ class AppRoutes {
   static const language = '/';
   static const login = '/login';
   static const pinSetup = '/pin-setup';
+  static const registrationCode = '/registration-code';
 
   // Patient
   static const patientHome = '/patient/home';
@@ -59,7 +62,7 @@ class AppRoutes {
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.patientHome,
+    initialLocation: AppRoutes.patientList,
     debugLogDiagnostics: true,
     routes: [
       // ---------- Auth / Shared ----------
@@ -77,6 +80,11 @@ class AppRouter {
         path: AppRoutes.pinSetup,
         name: 'pinSetup',
         builder: (context, state) => const PinSetupScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.registrationCode,
+        name: 'registrationCode',
+        builder: (context, state) => const RegistrationCodeScreen(),
       ),
 
       // ---------- Patient ----------

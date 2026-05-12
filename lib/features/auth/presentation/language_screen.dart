@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/continue_button.dart';
+import '../widgets/med_adhere_header.dart';
+
 void main() {
   runApp(const MedAdhereApp());
 }
@@ -91,40 +94,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Logo
-              Padding(
-                padding: const EdgeInsets.only(top: 40.0),
-                child: Image.asset(
-                  'assets/images/LOGO.png',
-                  height: 80,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 0),
-              // "MedAdhere" title (two colours)
-              const Padding(
-                padding: EdgeInsets.only(top: 24.0),
-                child: Text.rich(
-                  TextSpan(
-                    text: 'Med',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF165B9E),
-                    ),
-                    children: [
-                      TextSpan(
-                        text: 'Adhere',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A7E95),
-                        ),
-                      ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              const MedAdhereHeader(),
               const SizedBox(height: 40),
 
               // Language card (transparent background)
@@ -132,7 +102,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 clipBehavior: Clip.none,
                 margin: const EdgeInsets.symmetric(horizontal: 24),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 elevation: 0,
                 color: Colors.transparent,
@@ -146,12 +116,12 @@ class _LanguageScreenState extends State<LanguageScreen> {
                         'Language:',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 30,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 2),
 
                       // Language options
                       _buildLanguageOption(
@@ -159,61 +129,38 @@ class _LanguageScreenState extends State<LanguageScreen> {
                         value: 'en',
                         imagePath: 'assets/images/english.png',
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 19),
                       _buildLanguageOption(
                         language: 'isiZulu',
                         value: 'zu',
                         imagePath: 'assets/images/isiZulu.png',
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 19),
                       _buildLanguageOption(
                         language: 'isiXhosa',
                         value: 'xh',
                         imagePath: 'assets/images/isiXhosa.png',
                       ),
 
-                      const SizedBox(height: 24), // spacing before button
+                      const SizedBox(height: 56), // spacing before button
 
                       // Right‑aligned Continue button inside the card
                       Align(
                         alignment: Alignment.centerRight,
-                        child: ElevatedButton(
-                          // Inside LanguageScreen, replace your Continue button's onPressed:
+                        child: ContinueButton(
+                          onPressed: _selectedLanguage == null
+                              ? null
+                              : () async {
+                            const bool isExistingUser = false;
 
-                            onPressed: _selectedLanguage == null
-                                ? null
-                                : () async {
-                              // TODO: persist selected language via shared_preferences
-                              // await prefs.setString('language', _selectedLanguage!);
+                            if (!mounted) return;
 
-                              // TODO: replace with real check from auth_service / secure storage
-                              // e.g. final hasPin = await AuthService.instance.hasPinSetup();
-                              const bool isExistingUser = false; // placeholder
-
-                              if (!mounted) return;
-
-                              if (isExistingUser) {
-                                context.go('/login');      // existing user → enter PIN
-                              } else {
-                                context.go('/pin-setup');  // new user → create PIN
-                              }
-                            },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5DC7BD), // teal background
-                            foregroundColor: Colors.black,
-                            side: const BorderSide(
-                              color: Color(0xFF165B9E), // dark blue border
-                              width: 2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          child: const Text('Continue'),
+                            if (isExistingUser) {
+                              context.go('/login');
+                            } else {
+                              context.go('/registration-code');
+                            }
+                          },
                         ),
                       ),
                     ],
