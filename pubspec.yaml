@@ -63,6 +63,12 @@ flutter:
     - assets/images/english.png
     - assets/images/isiZulu.png
     - assets/images/isiXhosa.png
+    - assets/images/HOME_TAB.png
+    - assets/images/PROGRESS_TAB.png
+    - assets/images/MEDICATION_TAB.png 
+    - assets/images/PROFILE_TAB.png
+    - assets/images/MEDICINE.png
+    - assets/images/tick.png
       
 
   # An image asset can refer to one or more resolution-specific "variants", see

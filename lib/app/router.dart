@@ -59,7 +59,7 @@ class AppRoutes {
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.language,
+    initialLocation: AppRoutes.patientHome,
     debugLogDiagnostics: true,
     routes: [
       // ---------- Auth / Shared ----------
