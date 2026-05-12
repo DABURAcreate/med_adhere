@@ -62,7 +62,7 @@ class AppRoutes {
 
 class AppRouter {
   static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.patientHome,
+    initialLocation: AppRoutes.dashboard,
     debugLogDiagnostics: true,
     routes: [
       // ---------- Auth / Shared ----------
@@ -124,14 +124,14 @@ class AppRouter {
         path: AppRoutes.dashboard,
         name: 'dashboard',
         builder: (context, state) => const DashboardScreen(),
-        routes: [
-          GoRoute(
-            path: 'reports',
-            name: 'reports',
-            builder: (context, state) => const ReportScreen(),
-          ),
-        ],
       ),
+
+      GoRoute(
+        path: AppRoutes.reports,   // '/worker/reports'
+        name: 'reports',
+        builder: (context, state) => const ReportScreen(),
+      ),
+
       GoRoute(
         path: AppRoutes.patientList,
         name: 'patientList',
