@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart' show AppLocalizations;
 
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
@@ -10,6 +11,9 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // One line — gives you all translated strings for the current locale
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFE9E9E9),
       body: SafeArea(
@@ -21,9 +25,9 @@ class LoginScreen extends StatelessWidget {
               const MedAdhereHeader(),
               const SizedBox(height: 56),
 
-              const Text(
-                'Enter Your Pin:',
-                style: TextStyle(
+              Text(
+                l10n.enterYourPin,   // ← from your ARB files
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
@@ -35,9 +39,7 @@ class LoginScreen extends StatelessWidget {
               PinInputRow(
                 length: 4,
                 isObscured: true,
-                // boxSize and boxSpacing use defaults (70, 15)
                 onCompleted: (pin) {
-                  // TODO: validate pin against database
                   debugPrint('PIN entered: $pin');
                 },
               ),
@@ -49,9 +51,7 @@ class LoginScreen extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: ContinueButton(
-                    onPressed: () {
-                      context.go('/patient/home');
-                    },
+                    onPressed: () => context.go('/patient/home'),
                   ),
                 ),
               ),

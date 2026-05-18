@@ -1,0 +1,10 @@
+{
+  "@@locale": "en",
+  "enterYourPin": "Enter Your Pin:",
+  "enterRegistrationCode": "Enter Registration Code",
+  "continueButton": "Continue",
+  "navHome": "HOME",
+  "navProgress": "PROGRESS",
+  "navMeds": "MEDS",
+  "navRiskLevel": "RISK LEVEL"
+}

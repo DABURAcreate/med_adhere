@@ -1,24 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
+import '../../../providers/locale_provider.dart';
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
-
-void main() {
-  runApp(const MedAdhereApp());
-}
-
-class MedAdhereApp extends StatelessWidget {
-  const MedAdhereApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const LanguageScreen(),
-    );
-  }
-}
 
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key});
@@ -30,42 +16,43 @@ class LanguageScreen extends StatefulWidget {
 class _LanguageScreenState extends State<LanguageScreen> {
   String? _selectedLanguage;
 
-  // Helper to build a language option box
+  void _selectLanguage(String value) {
+    setState(() => _selectedLanguage = value);
+    context.read<LocaleProvider>().setLocale(Locale(value));
+  }
+
   Widget _buildLanguageOption({
     required String language,
     required String value,
     required String imagePath,
   }) {
+    final isSelected = _selectedLanguage == value;
+
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedLanguage = value;
-        });
-      },
-      // Wrap in a widget that doesn’t clip
+      onTap: () => _selectLanguage(value),
       child: Container(
-        clipBehavior: Clip.none, // allows shadow to paint outside
+        clipBehavior: Clip.none,
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 39, 133, 124),
+          color: isSelected
+              ? const Color.fromARGB(255, 25, 95, 88)
+              : const Color.fromARGB(255, 39, 133, 124),
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.8), // stronger opacity
+              color: Colors.black.withOpacity(0.8),
               blurRadius: 6,
               offset: const Offset(0, 2),
-              spreadRadius: 1, // makes shadow a bit larger
+              spreadRadius: 1,
             ),
           ],
+          border: isSelected
+              ? Border.all(color: Colors.white, width: 2)
+              : null,
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Row(
           children: [
-            Image.asset(
-              imagePath,
-              height: 50,
-              width: 50,
-              fit: BoxFit.contain,
-            ),
+            Image.asset(imagePath, height: 50, width: 50, fit: BoxFit.contain),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -77,6 +64,8 @@ class _LanguageScreenState extends State<LanguageScreen> {
                 ),
               ),
             ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: Colors.white, size: 24),
           ],
         ),
       ),
@@ -90,86 +79,67 @@ class _LanguageScreenState extends State<LanguageScreen> {
       body: SafeArea(
         child: SizedBox(
           width: double.infinity,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Logo
-              const MedAdhereHeader(),
-              const SizedBox(height: 40),
-
-              // Language card (transparent background)
-              Card(
-                clipBehavior: Clip.none,
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 0,
-                color: Colors.transparent,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch, // so Align works correctly
-                    children: [
-                      // Centred "Language:" title
-                      const Text(
-                        'Language:',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const MedAdhereHeader(),
+                const SizedBox(height: 40),
+                Card(
+                  clipBehavior: Clip.none,
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  elevation: 0,
+                  color: Colors.transparent,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Language:',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-
-                      // Language options
-                      _buildLanguageOption(
-                        language: 'English',
-                        value: 'en',
-                        imagePath: 'assets/images/english.png',
-                      ),
-                      const SizedBox(height: 19),
-                      _buildLanguageOption(
-                        language: 'isiZulu',
-                        value: 'zu',
-                        imagePath: 'assets/images/isiZulu.png',
-                      ),
-                      const SizedBox(height: 19),
-                      _buildLanguageOption(
-                        language: 'isiXhosa',
-                        value: 'xh',
-                        imagePath: 'assets/images/isiXhosa.png',
-                      ),
-
-                      const SizedBox(height: 56), // spacing before button
-
-                      // Right‑aligned Continue button inside the card
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ContinueButton(
-                          onPressed: _selectedLanguage == null
-                              ? null
-                              : () async {
-                            const bool isExistingUser = false;
-
-                            if (!mounted) return;
-
-                            if (isExistingUser) {
-                              context.go('/login');
-                            } else {
-                              context.go('/registration-code');
-                            }
-                          },
+                        const SizedBox(height: 12),
+                        _buildLanguageOption(
+                          language: 'English',
+                          value: 'en',
+                          imagePath: 'assets/images/english.png',
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 19),
+                        _buildLanguageOption(
+                          language: 'isiZulu',
+                          value: 'zu',
+                          imagePath: 'assets/images/isiZulu.png',
+                        ),
+                        const SizedBox(height: 56),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: ContinueButton(
+                            onPressed: _selectedLanguage == null
+                                ? null
+                                : () {
+                              const bool isExistingUser = false;
+                              if (!mounted) return;
+                              context.go(
+                                isExistingUser ? '/login' : '/registration-code',
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-
-              // No Spacer or button here – the button is inside the card now
-            ],
+              ],
+            ),
           ),
         ),
       ),

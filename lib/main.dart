@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mzansi_meds_reminder/providers/locale_provider.dart';
+
+import 'package:provider/provider.dart';
 import 'app/app.dart';
 
 Future<void> main() async {
@@ -15,5 +18,10 @@ Future<void> main() async {
   // - await AppDatabase.instance.open();
   // - await NotificationService.init();
 
-  runApp(const MedAdhereApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => LocaleProvider(),
+      child: const MedAdhereApp(),
+    ),
+  );
 }

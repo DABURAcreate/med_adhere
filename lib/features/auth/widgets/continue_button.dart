@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
+
 
 class ContinueButton extends StatelessWidget {
   final VoidCallback? onPressed;
-  final String text;
+  final String? text;
 
   const ContinueButton({
     super.key,
     required this.onPressed,
-    this.text = "Continue",
+    this.text,
   });
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
@@ -33,7 +37,7 @@ class ContinueButton extends StatelessWidget {
           vertical: 12,
         ),
       ),
-      child: Text(text),
+      child: Text(text ?? l10n.continueButton),
     );
   }
 }

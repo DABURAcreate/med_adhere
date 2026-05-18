@@ -20,7 +20,6 @@ import '../features/reminders/presentation/reminder_settings_screen.dart';
 import '../features/dashboard/presentation/dashboard_screen.dart';
 import '../features/dashboard/presentation/patient_list_screen.dart';
 
-
 // Worker — Patient Management
 import '../features/patient_management/presentation/register_patient_screen.dart';
 import '../features/patient_management/presentation/medication_schedule_screen.dart';
@@ -61,129 +60,117 @@ class AppRoutes {
 }
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: AppRoutes.language,
-    debugLogDiagnostics: true,
-    routes: [
-      // ---------- Auth / Shared ----------
-      GoRoute(
-        path: AppRoutes.language,
-        name: 'language',
-        builder: (context, state) => const LanguageScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.login,
-        name: 'login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.pinSetup,
-        name: 'pinSetup',
-        builder: (context, state) => const PinSetupScreen(),
-      ),
-      GoRoute(
-        path: AppRoutes.registrationCode,
-        name: 'registrationCode',
-        builder: (context, state) => const RegistrationCodeScreen(),
-      ),
-
-      // ---------- Patient ----------
-      GoRoute(
-        path: AppRoutes.patientHome,
-        name: 'patientHome',
-        builder: (context, state) => const HomeScreen(),
-        routes: [
-          GoRoute(
-            path: 'calendar',
-            name: 'adherenceCalendar',
-            builder: (context, state) => const AdherenceCalendarScreen(),
-          ),
-          GoRoute(
-            path: 'risk',
-            name: 'riskLevel',
-            builder: (context, state) => const RiskLevelScreen(),
-          ),
-          GoRoute(
-            path: 'reminders',
-            name: 'reminderSettings',
-            builder: (context, state) => const ReminderSettingsScreen(),
-          ),
-          GoRoute(
-            path: 'medication/:id',
-            name: 'medicationDetail',
-            builder: (context, state) {
-              final id = state.pathParameters['id']!;
-              return MedicationDetailScreen(medicationId: id);
-            },
-          ),
-        ],
-      ),
-
-      // ---------- Worker ----------
-      GoRoute(
-        path: AppRoutes.dashboard,
-        name: 'dashboard',
-        builder: (context, state) => const DashboardScreen(),
-      ),
-
-      GoRoute(
-        path: AppRoutes.reports,   // '/worker/reports'
-        name: 'reports',
-        builder: (context, state) => const ReportScreen(),
-      ),
-
-      GoRoute(
-        path: AppRoutes.patientList,
-        name: 'patientList',
-        builder: (context, state) => const PatientListScreen(),
-        routes: [
-          GoRoute(
-            path: 'register',
-            name: 'registerPatient',
-            builder: (context, state) => const RegisterPatientScreen(),
-          ),
-          GoRoute(
-            path: ':id',
-            name: 'patientDetail',
-            builder: (context, state) {
-              final id = state.pathParameters['id']!;
-              return PatientDetailScreen(patientId: id);
-            },
-            routes: [
-              GoRoute(
-                path: 'schedule',
-                name: 'medicationSchedule',
-                builder: (context, state) {
-                  final id = state.pathParameters['id']!;
-                  return MedicationScheduleScreen(patientId: id);
-                },
-              ),
-              GoRoute(
-                path: 'follow-up',
-                name: 'followUp',
-                builder: (context, state) {
-                  final id = state.pathParameters['id']!;
-                  return FollowUpScreen(patientId: id);
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-
-      // ---------- Caregiver (shared) ----------
-      GoRoute(
-        path: AppRoutes.caregiverLink,
-        name: 'caregiverLink',
-        builder: (context, state) => const CaregiverLinkScreen(),
-      ),
-    ],
-
-    // 404 fallback
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('Page not found: ${state.uri}'),
-      ),
+  // Routes as a static list — data only, no GoRouter instance here
+  static final List<RouteBase> routes = [
+    // ---------- Auth / Shared ----------
+    GoRoute(
+      path: AppRoutes.language,
+      name: 'language',
+      builder: (context, state) => const LanguageScreen(),
     ),
-  );
+    GoRoute(
+      path: AppRoutes.login,
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.pinSetup,
+      name: 'pinSetup',
+      builder: (context, state) => const PinSetupScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.registrationCode,
+      name: 'registrationCode',
+      builder: (context, state) => const RegistrationCodeScreen(),
+    ),
+
+    // ---------- Patient ----------
+    GoRoute(
+      path: AppRoutes.patientHome,
+      name: 'patientHome',
+      builder: (context, state) => const HomeScreen(),
+      routes: [
+        GoRoute(
+          path: 'calendar',
+          name: 'adherenceCalendar',
+          builder: (context, state) => const AdherenceCalendarScreen(),
+        ),
+        GoRoute(
+          path: 'risk',
+          name: 'riskLevel',
+          builder: (context, state) => const RiskLevelScreen(),
+        ),
+        GoRoute(
+          path: 'reminders',
+          name: 'reminderSettings',
+          builder: (context, state) => const ReminderSettingsScreen(),
+        ),
+        GoRoute(
+          path: 'medication/:id',
+          name: 'medicationDetail',
+          builder: (context, state) {
+            final id = state.pathParameters['id']!;
+            return MedicationDetailScreen(medicationId: id);
+          },
+        ),
+      ],
+    ),
+
+    // ---------- Worker ----------
+    GoRoute(
+      path: AppRoutes.dashboard,
+      name: 'dashboard',
+      builder: (context, state) => const DashboardScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.reports,
+      name: 'reports',
+      builder: (context, state) => const ReportScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.patientList,
+      name: 'patientList',
+      builder: (context, state) => const PatientListScreen(),
+      routes: [
+        GoRoute(
+          path: 'register',
+          name: 'registerPatient',
+          builder: (context, state) => const RegisterPatientScreen(),
+        ),
+        GoRoute(
+          path: ':id',
+          name: 'patientDetail',
+          builder: (context, state) {
+            final id = state.pathParameters['id']!;
+            return PatientDetailScreen(patientId: id);
+          },
+          routes: [
+            GoRoute(
+              path: 'schedule',
+              name: 'medicationSchedule',
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return MedicationScheduleScreen(patientId: id);
+              },
+            ),
+            GoRoute(
+              path: 'follow-up',
+              name: 'followUp',
+              builder: (context, state) {
+                final id = state.pathParameters['id']!;
+                return FollowUpScreen(patientId: id);
+              },
+            ),
+          ],
+        ),
+      ],
+    ),
+
+    // ---------- Caregiver ----------
+    GoRoute(
+      path: AppRoutes.caregiverLink,
+      name: 'caregiverLink',
+      builder: (context, state) => const CaregiverLinkScreen(),
+    ),
+  ];
 }

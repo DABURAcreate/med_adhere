@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 
 class MainScaffold extends StatelessWidget {
   final String title;
@@ -15,6 +16,8 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -68,7 +71,7 @@ class MainScaffold extends StatelessWidget {
               onTap: () {context.go('/patient/home');},
               child: _buildNavItem(
                 imagePath: "assets/images/HOME_TAB.png",
-                label: "HOME",
+                label: l10n.navHome,
                 index: 0,
               ),
             ),
@@ -77,7 +80,7 @@ class MainScaffold extends StatelessWidget {
               onTap: () {context.go('/patient/home/calendar');},
               child: _buildNavItem(
                 imagePath: "assets/images/PROGRESS_TAB.png",
-                label: "PROGRESS",
+                label: l10n.navProgress,
                 index: 1,
               ),
             ),
@@ -86,7 +89,7 @@ class MainScaffold extends StatelessWidget {
               onTap: () {context.go('/patient/home/medication/:id');},
               child: _buildNavItem(
                 imagePath: "assets/images/MEDICATION_TAB.png",
-                label: "MEDS",
+                label: l10n.navMeds,
                 index: 2,
               ),
             ),
@@ -95,7 +98,7 @@ class MainScaffold extends StatelessWidget {
               onTap: () {context.go('/patient/home/risk');},
               child: _buildNavItem(
                 imagePath: "assets/images/PROFILE_TAB.png",
-                label: "RISK LEVEL",
+                label: l10n.navRiskLevel,
                 index: 3,
               ),
             ),

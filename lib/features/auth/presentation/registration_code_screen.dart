@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
+
 
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
@@ -10,6 +12,8 @@ class RegistrationCodeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: const Color(0xFFE9E9E9),
       body: SafeArea(
@@ -22,9 +26,9 @@ class RegistrationCodeScreen extends StatelessWidget {
 
               const SizedBox(height: 56),
 
-              const Text(
-                'Enter Registration Code',
-                style: TextStyle(
+              Text(
+                l10n.enterRegistrationCode,
+                style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
