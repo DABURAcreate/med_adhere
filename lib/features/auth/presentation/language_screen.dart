@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/locale_provider.dart';
+import '../data/auth_repository.dart';
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
 
@@ -15,10 +16,24 @@ class LanguageScreen extends StatefulWidget {
 
 class _LanguageScreenState extends State<LanguageScreen> {
   String? _selectedLanguage;
+  bool _loading = false;
 
   void _selectLanguage(String value) {
     setState(() => _selectedLanguage = value);
     context.read<LocaleProvider>().setLocale(Locale(value));
+  }
+
+  Future<void> _onContinue() async {
+    if (_selectedLanguage == null || _loading) return;
+    setState(() => _loading = true);
+
+    final isExisting =
+        await context.read<AuthRepository>().isExistingUser();
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    context.go(isExisting ? '/login' : '/registration-code');
   }
 
   Widget _buildLanguageOption({
@@ -39,7 +54,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.8),
+              color: Colors.black.withValues(alpha: 0.8),
               blurRadius: 6,
               offset: const Offset(0, 2),
               spreadRadius: 1,
@@ -122,17 +137,13 @@ class _LanguageScreenState extends State<LanguageScreen> {
                         const SizedBox(height: 56),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: ContinueButton(
-                            onPressed: _selectedLanguage == null
-                                ? null
-                                : () {
-                              const bool isExistingUser = false;
-                              if (!mounted) return;
-                              context.go(
-                                isExistingUser ? '/login' : '/registration-code',
-                              );
-                            },
-                          ),
+                          child: _loading
+                              ? const CircularProgressIndicator()
+                              : ContinueButton(
+                                  onPressed: _selectedLanguage == null
+                                      ? null
+                                      : _onContinue,
+                                ),
                         ),
                       ],
                     ),

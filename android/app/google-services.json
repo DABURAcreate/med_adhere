@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "840559421658",
+    "project_id": "med-adhere-app",
+    "storage_bucket": "med-adhere-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:840559421658:android:10f705d6b01c6bfd841de3",
+        "android_client_info": {
+          "package_name": "com.example.mzansi_meds_reminder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCoKSIum7wQQEUq1q34_Ku0E326R2xEkzI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

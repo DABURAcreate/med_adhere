@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 // Auth
 import '../features/auth/presentation/login_screen.dart';
@@ -32,6 +33,9 @@ import '../features/reports/presentation/report_screen.dart';
 // Caregiver
 import '../features/caregiver/presentation/caregiver_link_screen.dart';
 
+// Providers
+import '../providers/session_provider.dart';
+
 class AppRoutes {
   // Shared / Auth
   static const language = '/';
@@ -57,10 +61,18 @@ class AppRoutes {
 
   // Shared
   static const caregiverLink = '/caregiver/link';
+
+  static const _authRoutes = {
+    '/',
+    '/login',
+    '/registration-code',
+    '/pin-setup',
+  };
+
+  static bool isAuthRoute(String path) => _authRoutes.contains(path);
 }
 
 class AppRouter {
-  // Routes as a static list — data only, no GoRouter instance here
   static final List<RouteBase> routes = [
     // ---------- Auth / Shared ----------
     GoRoute(
@@ -76,7 +88,10 @@ class AppRouter {
     GoRoute(
       path: AppRoutes.pinSetup,
       name: 'pinSetup',
-      builder: (context, state) => const PinSetupScreen(),
+      builder: (context, state) {
+        final patientId = state.extra as int? ?? 0;
+        return PinSetupScreen(patientId: patientId);
+      },
     ),
     GoRoute(
       path: AppRoutes.registrationCode,
@@ -173,4 +188,18 @@ class AppRouter {
       builder: (context, state) => const CaregiverLinkScreen(),
     ),
   ];
+
+  /// Redirects authenticated users away from auth screens to their home.
+  static String? redirect(BuildContext context, GoRouterState state) {
+    final session = context.read<SessionProvider>();
+    final isAuth = session.isAuthenticated;
+    final onAuthRoute = AppRoutes.isAuthRoute(state.uri.path);
+
+    if (isAuth && onAuthRoute) {
+      return session.role == 'worker'
+          ? AppRoutes.dashboard
+          : AppRoutes.patientHome;
+    }
+    return null;
+  }
 }
