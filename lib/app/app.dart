@@ -23,7 +23,7 @@ class _MedAdhereAppState extends State<MedAdhereApp> {
   void initState() {
     super.initState();
     _router = GoRouter(
-      initialLocation: '/',
+      initialLocation: '/login',
       debugLogDiagnostics: true,
       routes: AppRouter.routes,
       redirect: AppRouter.redirect,
