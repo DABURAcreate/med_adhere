@@ -26,3 +26,5 @@ const String kColPatients = 'patients';
 const String kColMedications = 'medications';
 const String kColReminders = 'reminders';
 const String kColAdherenceLogs = 'adherence_logs';
+// Stores one document per activation code (doc ID = code) for O(1) patient lookup.
+const String kColActivationCodes = 'activation_codes';

@@ -35,6 +35,7 @@ class _RegistrationCodeScreenState extends State<RegistrationCodeScreen> {
 
     switch (result) {
       case AuthSuccess(:final patientId):
+        print('ACTIVATED PATIENT ID: $patientId');
         context.go('/pin-setup', extra: patientId);
       case AuthFailure(:final message):
         setState(() => _error = message);

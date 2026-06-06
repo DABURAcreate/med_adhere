@@ -124,6 +124,54 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     requiredDuringInsert: false,
     defaultValue: const Constant('low'),
   );
+  static const VerificationMeta _activationCodeMeta = const VerificationMeta(
+    'activationCode',
+  );
+  @override
+  late final GeneratedColumn<String> activationCode = GeneratedColumn<String>(
+    'activation_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isActivatedMeta = const VerificationMeta(
+    'isActivated',
+  );
+  @override
+  late final GeneratedColumn<bool> isActivated = GeneratedColumn<bool>(
+    'is_activated',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_activated" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _activatedAtMeta = const VerificationMeta(
+    'activatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> activatedAt = GeneratedColumn<DateTime>(
+    'activated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _conditionsMeta = const VerificationMeta(
+    'conditions',
+  );
+  @override
+  late final GeneratedColumn<String> conditions = GeneratedColumn<String>(
+    'conditions',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isSyncedMeta = const VerificationMeta(
     'isSynced',
   );
@@ -175,6 +223,10 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     pinHash,
     caregiverPhone,
     riskLevel,
+    activationCode,
+    isActivated,
+    activatedAt,
+    conditions,
     isSynced,
     createdAt,
     updatedAt,
@@ -272,6 +324,39 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         riskLevel.isAcceptableOrUnknown(data['risk_level']!, _riskLevelMeta),
       );
     }
+    if (data.containsKey('activation_code')) {
+      context.handle(
+        _activationCodeMeta,
+        activationCode.isAcceptableOrUnknown(
+          data['activation_code']!,
+          _activationCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('is_activated')) {
+      context.handle(
+        _isActivatedMeta,
+        isActivated.isAcceptableOrUnknown(
+          data['is_activated']!,
+          _isActivatedMeta,
+        ),
+      );
+    }
+    if (data.containsKey('activated_at')) {
+      context.handle(
+        _activatedAtMeta,
+        activatedAt.isAcceptableOrUnknown(
+          data['activated_at']!,
+          _activatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('conditions')) {
+      context.handle(
+        _conditionsMeta,
+        conditions.isAcceptableOrUnknown(data['conditions']!, _conditionsMeta),
+      );
+    }
     if (data.containsKey('is_synced')) {
       context.handle(
         _isSyncedMeta,
@@ -339,6 +424,22 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         DriftSqlType.string,
         data['${effectivePrefix}risk_level'],
       )!,
+      activationCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}activation_code'],
+      ),
+      isActivated: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_activated'],
+      )!,
+      activatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}activated_at'],
+      ),
+      conditions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conditions'],
+      ),
       isSynced: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_synced'],
@@ -371,6 +472,10 @@ class Patient extends DataClass implements Insertable<Patient> {
   final String pinHash;
   final String? caregiverPhone;
   final String riskLevel;
+  final String? activationCode;
+  final bool isActivated;
+  final DateTime? activatedAt;
+  final String? conditions;
   final bool isSynced;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -385,6 +490,10 @@ class Patient extends DataClass implements Insertable<Patient> {
     required this.pinHash,
     this.caregiverPhone,
     required this.riskLevel,
+    this.activationCode,
+    required this.isActivated,
+    this.activatedAt,
+    this.conditions,
     required this.isSynced,
     required this.createdAt,
     required this.updatedAt,
@@ -404,6 +513,16 @@ class Patient extends DataClass implements Insertable<Patient> {
       map['caregiver_phone'] = Variable<String>(caregiverPhone);
     }
     map['risk_level'] = Variable<String>(riskLevel);
+    if (!nullToAbsent || activationCode != null) {
+      map['activation_code'] = Variable<String>(activationCode);
+    }
+    map['is_activated'] = Variable<bool>(isActivated);
+    if (!nullToAbsent || activatedAt != null) {
+      map['activated_at'] = Variable<DateTime>(activatedAt);
+    }
+    if (!nullToAbsent || conditions != null) {
+      map['conditions'] = Variable<String>(conditions);
+    }
     map['is_synced'] = Variable<bool>(isSynced);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -424,6 +543,16 @@ class Patient extends DataClass implements Insertable<Patient> {
           ? const Value.absent()
           : Value(caregiverPhone),
       riskLevel: Value(riskLevel),
+      activationCode: activationCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activationCode),
+      isActivated: Value(isActivated),
+      activatedAt: activatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activatedAt),
+      conditions: conditions == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conditions),
       isSynced: Value(isSynced),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -446,6 +575,10 @@ class Patient extends DataClass implements Insertable<Patient> {
       pinHash: serializer.fromJson<String>(json['pinHash']),
       caregiverPhone: serializer.fromJson<String?>(json['caregiverPhone']),
       riskLevel: serializer.fromJson<String>(json['riskLevel']),
+      activationCode: serializer.fromJson<String?>(json['activationCode']),
+      isActivated: serializer.fromJson<bool>(json['isActivated']),
+      activatedAt: serializer.fromJson<DateTime?>(json['activatedAt']),
+      conditions: serializer.fromJson<String?>(json['conditions']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -465,6 +598,10 @@ class Patient extends DataClass implements Insertable<Patient> {
       'pinHash': serializer.toJson<String>(pinHash),
       'caregiverPhone': serializer.toJson<String?>(caregiverPhone),
       'riskLevel': serializer.toJson<String>(riskLevel),
+      'activationCode': serializer.toJson<String?>(activationCode),
+      'isActivated': serializer.toJson<bool>(isActivated),
+      'activatedAt': serializer.toJson<DateTime?>(activatedAt),
+      'conditions': serializer.toJson<String?>(conditions),
       'isSynced': serializer.toJson<bool>(isSynced),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -482,6 +619,10 @@ class Patient extends DataClass implements Insertable<Patient> {
     String? pinHash,
     Value<String?> caregiverPhone = const Value.absent(),
     String? riskLevel,
+    Value<String?> activationCode = const Value.absent(),
+    bool? isActivated,
+    Value<DateTime?> activatedAt = const Value.absent(),
+    Value<String?> conditions = const Value.absent(),
     bool? isSynced,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -498,6 +639,12 @@ class Patient extends DataClass implements Insertable<Patient> {
         ? caregiverPhone.value
         : this.caregiverPhone,
     riskLevel: riskLevel ?? this.riskLevel,
+    activationCode: activationCode.present
+        ? activationCode.value
+        : this.activationCode,
+    isActivated: isActivated ?? this.isActivated,
+    activatedAt: activatedAt.present ? activatedAt.value : this.activatedAt,
+    conditions: conditions.present ? conditions.value : this.conditions,
     isSynced: isSynced ?? this.isSynced,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -522,6 +669,18 @@ class Patient extends DataClass implements Insertable<Patient> {
           ? data.caregiverPhone.value
           : this.caregiverPhone,
       riskLevel: data.riskLevel.present ? data.riskLevel.value : this.riskLevel,
+      activationCode: data.activationCode.present
+          ? data.activationCode.value
+          : this.activationCode,
+      isActivated: data.isActivated.present
+          ? data.isActivated.value
+          : this.isActivated,
+      activatedAt: data.activatedAt.present
+          ? data.activatedAt.value
+          : this.activatedAt,
+      conditions: data.conditions.present
+          ? data.conditions.value
+          : this.conditions,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -541,6 +700,10 @@ class Patient extends DataClass implements Insertable<Patient> {
           ..write('pinHash: $pinHash, ')
           ..write('caregiverPhone: $caregiverPhone, ')
           ..write('riskLevel: $riskLevel, ')
+          ..write('activationCode: $activationCode, ')
+          ..write('isActivated: $isActivated, ')
+          ..write('activatedAt: $activatedAt, ')
+          ..write('conditions: $conditions, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -560,6 +723,10 @@ class Patient extends DataClass implements Insertable<Patient> {
     pinHash,
     caregiverPhone,
     riskLevel,
+    activationCode,
+    isActivated,
+    activatedAt,
+    conditions,
     isSynced,
     createdAt,
     updatedAt,
@@ -578,6 +745,10 @@ class Patient extends DataClass implements Insertable<Patient> {
           other.pinHash == this.pinHash &&
           other.caregiverPhone == this.caregiverPhone &&
           other.riskLevel == this.riskLevel &&
+          other.activationCode == this.activationCode &&
+          other.isActivated == this.isActivated &&
+          other.activatedAt == this.activatedAt &&
+          other.conditions == this.conditions &&
           other.isSynced == this.isSynced &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -594,6 +765,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
   final Value<String> pinHash;
   final Value<String?> caregiverPhone;
   final Value<String> riskLevel;
+  final Value<String?> activationCode;
+  final Value<bool> isActivated;
+  final Value<DateTime?> activatedAt;
+  final Value<String?> conditions;
   final Value<bool> isSynced;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -608,6 +783,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     this.pinHash = const Value.absent(),
     this.caregiverPhone = const Value.absent(),
     this.riskLevel = const Value.absent(),
+    this.activationCode = const Value.absent(),
+    this.isActivated = const Value.absent(),
+    this.activatedAt = const Value.absent(),
+    this.conditions = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -623,6 +802,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     required String pinHash,
     this.caregiverPhone = const Value.absent(),
     this.riskLevel = const Value.absent(),
+    this.activationCode = const Value.absent(),
+    this.isActivated = const Value.absent(),
+    this.activatedAt = const Value.absent(),
+    this.conditions = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -643,6 +826,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Expression<String>? pinHash,
     Expression<String>? caregiverPhone,
     Expression<String>? riskLevel,
+    Expression<String>? activationCode,
+    Expression<bool>? isActivated,
+    Expression<DateTime>? activatedAt,
+    Expression<String>? conditions,
     Expression<bool>? isSynced,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -658,6 +845,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       if (pinHash != null) 'pin_hash': pinHash,
       if (caregiverPhone != null) 'caregiver_phone': caregiverPhone,
       if (riskLevel != null) 'risk_level': riskLevel,
+      if (activationCode != null) 'activation_code': activationCode,
+      if (isActivated != null) 'is_activated': isActivated,
+      if (activatedAt != null) 'activated_at': activatedAt,
+      if (conditions != null) 'conditions': conditions,
       if (isSynced != null) 'is_synced': isSynced,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -675,6 +866,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Value<String>? pinHash,
     Value<String?>? caregiverPhone,
     Value<String>? riskLevel,
+    Value<String?>? activationCode,
+    Value<bool>? isActivated,
+    Value<DateTime?>? activatedAt,
+    Value<String?>? conditions,
     Value<bool>? isSynced,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -690,6 +885,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       pinHash: pinHash ?? this.pinHash,
       caregiverPhone: caregiverPhone ?? this.caregiverPhone,
       riskLevel: riskLevel ?? this.riskLevel,
+      activationCode: activationCode ?? this.activationCode,
+      isActivated: isActivated ?? this.isActivated,
+      activatedAt: activatedAt ?? this.activatedAt,
+      conditions: conditions ?? this.conditions,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -729,6 +928,18 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     if (riskLevel.present) {
       map['risk_level'] = Variable<String>(riskLevel.value);
     }
+    if (activationCode.present) {
+      map['activation_code'] = Variable<String>(activationCode.value);
+    }
+    if (isActivated.present) {
+      map['is_activated'] = Variable<bool>(isActivated.value);
+    }
+    if (activatedAt.present) {
+      map['activated_at'] = Variable<DateTime>(activatedAt.value);
+    }
+    if (conditions.present) {
+      map['conditions'] = Variable<String>(conditions.value);
+    }
     if (isSynced.present) {
       map['is_synced'] = Variable<bool>(isSynced.value);
     }
@@ -754,6 +965,10 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
           ..write('pinHash: $pinHash, ')
           ..write('caregiverPhone: $caregiverPhone, ')
           ..write('riskLevel: $riskLevel, ')
+          ..write('activationCode: $activationCode, ')
+          ..write('isActivated: $isActivated, ')
+          ..write('activatedAt: $activatedAt, ')
+          ..write('conditions: $conditions, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -3275,6 +3490,10 @@ typedef $$PatientsTableCreateCompanionBuilder =
       required String pinHash,
       Value<String?> caregiverPhone,
       Value<String> riskLevel,
+      Value<String?> activationCode,
+      Value<bool> isActivated,
+      Value<DateTime?> activatedAt,
+      Value<String?> conditions,
       Value<bool> isSynced,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -3291,6 +3510,10 @@ typedef $$PatientsTableUpdateCompanionBuilder =
       Value<String> pinHash,
       Value<String?> caregiverPhone,
       Value<String> riskLevel,
+      Value<String?> activationCode,
+      Value<bool> isActivated,
+      Value<DateTime?> activatedAt,
+      Value<String?> conditions,
       Value<bool> isSynced,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -3411,6 +3634,26 @@ class $$PatientsTableFilterComposer
 
   ColumnFilters<String> get riskLevel => $composableBuilder(
     column: $table.riskLevel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get activationCode => $composableBuilder(
+    column: $table.activationCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActivated => $composableBuilder(
+    column: $table.isActivated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conditions => $composableBuilder(
+    column: $table.conditions,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3564,6 +3807,26 @@ class $$PatientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get activationCode => $composableBuilder(
+    column: $table.activationCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActivated => $composableBuilder(
+    column: $table.isActivated,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isSynced => $composableBuilder(
     column: $table.isSynced,
     builder: (column) => ColumnOrderings(column),
@@ -3626,6 +3889,26 @@ class $$PatientsTableAnnotationComposer
 
   GeneratedColumn<String> get riskLevel =>
       $composableBuilder(column: $table.riskLevel, builder: (column) => column);
+
+  GeneratedColumn<String> get activationCode => $composableBuilder(
+    column: $table.activationCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActivated => $composableBuilder(
+    column: $table.isActivated,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get activatedAt => $composableBuilder(
+    column: $table.activatedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get conditions => $composableBuilder(
+    column: $table.conditions,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isSynced =>
       $composableBuilder(column: $table.isSynced, builder: (column) => column);
@@ -3754,6 +4037,10 @@ class $$PatientsTableTableManager
                 Value<String> pinHash = const Value.absent(),
                 Value<String?> caregiverPhone = const Value.absent(),
                 Value<String> riskLevel = const Value.absent(),
+                Value<String?> activationCode = const Value.absent(),
+                Value<bool> isActivated = const Value.absent(),
+                Value<DateTime?> activatedAt = const Value.absent(),
+                Value<String?> conditions = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -3768,6 +4055,10 @@ class $$PatientsTableTableManager
                 pinHash: pinHash,
                 caregiverPhone: caregiverPhone,
                 riskLevel: riskLevel,
+                activationCode: activationCode,
+                isActivated: isActivated,
+                activatedAt: activatedAt,
+                conditions: conditions,
                 isSynced: isSynced,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -3784,6 +4075,10 @@ class $$PatientsTableTableManager
                 required String pinHash,
                 Value<String?> caregiverPhone = const Value.absent(),
                 Value<String> riskLevel = const Value.absent(),
+                Value<String?> activationCode = const Value.absent(),
+                Value<bool> isActivated = const Value.absent(),
+                Value<DateTime?> activatedAt = const Value.absent(),
+                Value<String?> conditions = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -3798,6 +4093,10 @@ class $$PatientsTableTableManager
                 pinHash: pinHash,
                 caregiverPhone: caregiverPhone,
                 riskLevel: riskLevel,
+                activationCode: activationCode,
+                isActivated: isActivated,
+                activatedAt: activatedAt,
+                conditions: conditions,
                 isSynced: isSynced,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

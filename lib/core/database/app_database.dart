@@ -46,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   // ─── Schema version ───────────────────────────────────────────────────────
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   // ─── Migrations ───────────────────────────────────────────────────────────
 
@@ -57,11 +57,13 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
     },
     onUpgrade: (m, from, to) async {
-      // Add future migration steps here as schema version increases.
-      // Example for v2:
-      //   if (from < 2) {
-      //     await m.addColumn(patients, patients.someNewColumn);
-      //   }
+      // v2: activation code + conditions fields added to patients.
+      if (from < 2) {
+        await m.addColumn(patients, patients.activationCode);
+        await m.addColumn(patients, patients.isActivated);
+        await m.addColumn(patients, patients.activatedAt);
+        await m.addColumn(patients, patients.conditions);
+      }
     },
     beforeOpen: (details) async {
       // Enable foreign key enforcement — SQLite disables this by default.

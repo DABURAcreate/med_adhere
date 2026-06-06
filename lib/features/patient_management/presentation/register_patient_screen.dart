@@ -2,6 +2,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../data/patient_mgmt_repository.dart';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
@@ -80,8 +83,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
   final List<_MedicationEntry> _medications = [_MedicationEntry()];
   final _step2Key = GlobalKey<FormState>();
 
-  // Generated on register
-  late final String _activationCode;
+  // Preview code shown in step 4; replaced with the Firestore-validated code
+  // returned by the repository after "Register Patient" succeeds.
+  String _activationCode = '';
+  bool _isSaving = false;
 
   static const _conditions = ['HIV', 'TB', 'Hypertension', 'Diabetes', 'Other'];
 
@@ -89,7 +94,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
   void initState() {
     super.initState();
     _patientCodeCtrl.text = _generatePatientCode();
-    _activationCode = _generateActivationCode();
+    _activationCode = _generateActivationCode(); // preview; replaced on save
   }
 
   @override
@@ -137,8 +142,41 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
     ));
   }
 
-  void _register() {
-    _showSuccessSheet();
+  Future<void> _register() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    final meds = _medications
+        .map(
+          (m) => MedicationRegistrationData(
+            name: m.name.trim(),
+            dosage: m.dosage.trim(),
+            timesPerDay: m.timesPerDay,
+            reminderTimes: m.reminderTimes.map(_formatTime).toList(),
+          ),
+        )
+        .toList();
+
+    final result = await context.read<PatientMgmtRepository>().registerPatient(
+          fullName: _fullNameCtrl.text.trim(),
+          clinicCode: _patientCodeCtrl.text.trim(),
+          conditions: _selectedConditions.join(','),
+          caregiverPhone: _caregiverPhoneCtrl.text.trim().isEmpty
+              ? null
+              : _caregiverPhoneCtrl.text.trim(),
+          medications: meds,
+        );
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    switch (result) {
+      case RegistrationSuccess(:final activationCode):
+        setState(() => _activationCode = activationCode);
+        _showSuccessSheet();
+      case RegistrationFailure(:final message):
+        _showSnack('Registration failed: $message');
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -335,20 +373,19 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         if (_step > 0) const SizedBox(width: 12),
         Expanded(
           flex: 2,
-          child: ElevatedButton.icon(
-            onPressed: _step == 3 ? _register : _next,
-            icon: Icon(
-              _step == 3
-                  ? Icons.how_to_reg_rounded
-                  : Icons.arrow_forward_rounded,
-              size: 18,
-            ),
-            label: Text(_step == 3 ? 'Register Patient' : 'Next'),
+          child: ElevatedButton(
+            onPressed: _isSaving
+                ? null
+                : (_step == 3 ? _register : _next),
             style: ElevatedButton.styleFrom(
               backgroundColor: _step == 3
                   ? const Color(0xFF16A34A)
                   : kP3,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: (_step == 3
+                      ? const Color(0xFF16A34A)
+                      : kP3)
+                  .withOpacity(0.6),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -356,6 +393,29 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                   fontSize: 13, fontWeight: FontWeight.w700),
               elevation: 0,
             ),
+            child: _isSaving && _step == 3
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _step == 3
+                            ? Icons.how_to_reg_rounded
+                            : Icons.arrow_forward_rounded,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_step == 3 ? 'Register Patient' : 'Next'),
+                    ],
+                  ),
           ),
         ),
       ],
@@ -964,32 +1024,35 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
               const SizedBox(height: 20),
               // Code display
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _activationCode.split('').map((digit) {
-                  return Container(
-                    width: 48,
-                    height: 58,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.3)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        digit,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 0,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: _activationCode.split('').map((digit) {
+                    return Container(
+                      width: 48,
+                      height: 58,
+                      margin: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          digit,
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0,
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
+                    );
+                  }).toList(),
+                ),
               ),
               const SizedBox(height: 16),
               GestureDetector(

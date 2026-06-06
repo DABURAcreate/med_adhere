@@ -193,6 +193,14 @@ class AppRouter {
   static String? redirect(BuildContext context, GoRouterState state) {
     final session = context.read<SessionProvider>();
     final isAuth = session.isAuthenticated;
+
+    // Always allow language screen
+    if (state.uri.path == AppRoutes.language ||
+        state.uri.path == AppRoutes.registrationCode ||
+        state.uri.path == AppRoutes.pinSetup) {
+      return null;
+    }
+
     final onAuthRoute = AppRoutes.isAuthRoute(state.uri.path);
 
     if (isAuth && onAuthRoute) {

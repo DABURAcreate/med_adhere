@@ -32,6 +32,12 @@ class PatientsDao extends DatabaseAccessor<AppDatabase>
       (select(patients)..where((p) => p.registrationCode.equals(code)))
           .getSingleOrNull();
 
+  /// Fetch a patient by their 5-digit activation code.
+  /// Used by auth_repository when a patient enters their activation code.
+  Future<Patient?> getPatientByActivationCode(String code) =>
+      (select(patients)..where((p) => p.activationCode.equals(code)))
+          .getSingleOrNull();
+
   /// Watch a single patient row — emits a new value whenever the row changes.
   /// Used by home_screen.dart to reactively update the UI.
   Stream<Patient?> watchPatientById(int id) =>
@@ -94,6 +100,16 @@ class PatientsDao extends DatabaseAccessor<AppDatabase>
     id,
     PatientsCompanion(
       pinHash: Value(pinHash),
+      updatedAt: Value(DateTime.now()),
+    ),
+  );
+
+  /// Mark a patient as activated — called by auth_repository after PIN setup.
+  Future<int> markAsActivated(int id) => updatePatientFields(
+    id,
+    PatientsCompanion(
+      isActivated: const Value(true),
+      activatedAt: Value(DateTime.now()),
       updatedAt: Value(DateTime.now()),
     ),
   );

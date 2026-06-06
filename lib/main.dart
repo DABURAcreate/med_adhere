@@ -13,6 +13,7 @@ import 'features/auth/data/auth_repository.dart';
 import 'features/dashboard/data/dashboard_repository.dart';
 import 'features/patient/data/adherence_repository.dart';
 import 'features/patient/data/patient_repository.dart';
+import 'features/patient_management/data/patient_mgmt_repository.dart';
 import 'features/risk_assessment/domain/risk_engine.dart';
 import 'firebase_options.dart';
 import 'providers/locale_provider.dart';
@@ -41,6 +42,7 @@ Future<void> main() async {
   final adherenceRepo = AdherenceRepository(db: db, riskEngine: riskEngine);
   final dashboardRepo = DashboardRepository(db: db);
   final authRepo = AuthRepository(db: db);
+  final patientMgmtRepo = PatientMgmtRepository(db: db);
 
   // Restore previous session if one was saved on disk.
   final session = SessionProvider();
@@ -68,6 +70,7 @@ Future<void> main() async {
         Provider<AdherenceRepository>.value(value: adherenceRepo),
         Provider<DashboardRepository>.value(value: dashboardRepo),
         Provider<AuthRepository>.value(value: authRepo),
+        Provider<PatientMgmtRepository>.value(value: patientMgmtRepo),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],

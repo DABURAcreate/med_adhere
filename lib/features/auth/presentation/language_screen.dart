@@ -6,6 +6,7 @@ import '../../../providers/locale_provider.dart';
 import '../data/auth_repository.dart';
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
+import '../../../app/router.dart';
 
 class LanguageScreen extends StatefulWidget {
   const LanguageScreen({super.key});
@@ -25,15 +26,15 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
   Future<void> _onContinue() async {
     if (_selectedLanguage == null || _loading) return;
+
     setState(() => _loading = true);
 
-    final isExisting =
-        await context.read<AuthRepository>().isExistingUser();
+    context.read<LocaleProvider>().setLocale(Locale(_selectedLanguage!));
 
     if (!mounted) return;
     setState(() => _loading = false);
 
-    context.go(isExisting ? '/login' : '/registration-code');
+    context.go(AppRoutes.registrationCode);
   }
 
   Widget _buildLanguageOption({
@@ -144,6 +145,22 @@ class _LanguageScreenState extends State<LanguageScreen> {
                                       ? null
                                       : _onContinue,
                                 ),
+                        ),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              context.go(AppRoutes.login);
+                            },
+                            child: const Text(
+                              'Healthcare worker login',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromARGB(255, 25, 95, 88),
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
