@@ -47,8 +47,7 @@ class AuthRepository {
   Future<AuthResult> _lookupFromFirestore(String code) async {
     final fs = FirebaseFirestore.instance;
 
-    final codeDoc =
-        await fs.collection(kColActivationCodes).doc(code).get();
+    final codeDoc = await fs.collection(kColActivationCodes).doc(code).get();
 
     if (!codeDoc.exists) {
       return const AuthFailure(
@@ -57,16 +56,61 @@ class AuthRepository {
     }
 
     final codeData = codeDoc.data()!;
-    if (codeData['isActivated'] == true) {
-      return const AuthFailure(
-        'This activation code has already been used.',
-      );
-    }
-
     final patientDocId = codeData['patientFirestoreDocId'] as String;
 
+    // ── Already activated ──────────────────────────────────────────────────
+    // The account exists in Firestore. This device may be a second device or
+    // a reinstall — pull the full patient record (including pinHash) so the
+    // user can log in with their existing PIN without going through setup again.
+    if (codeData['isActivated'] == true) {
+      // If we already have a local record (e.g. mid-registration retry), reuse it.
+      final existing = await _db.patientsDao.getPatientByActivationCode(code);
+      if (existing != null) {
+        final needsSetup = existing.pinHash.isEmpty;
+        return AuthSuccess(existing.id, needsPinSetup: needsSetup);
+      }
+
+      // Pull the patient document from Firestore, including the pinHash that
+      // was saved when the account was first activated.
+      final patientDoc =
+          await fs.collection(kColPatients).doc(patientDocId).get();
+      if (!patientDoc.exists) {
+        return const AuthFailure(
+          'Patient record not found. Please contact your clinic.',
+        );
+      }
+
+      final pd = patientDoc.data()!;
+      final existingPin = pd['pinHash'] as String? ?? '';
+
+      final localId = await _db.patientsDao.insertPatient(
+        PatientsCompanion(
+          registrationCode: Value(pd['registrationCode'] as String? ?? ''),
+          fullName: Value(pd['fullName'] as String? ?? ''),
+          phoneNumber: Value(pd['phoneNumber'] as String? ?? ''),
+          dateOfBirth: Value(pd['dateOfBirth'] as String? ?? ''),
+          gender: Value(pd['gender'] as String? ?? 'other'),
+          pinHash: Value(existingPin),
+          activationCode: Value(code),
+          conditions: Value(pd['conditions'] as String?),
+          caregiverPhone: Value(pd['caregiverPhone'] as String?),
+          isActivated: const Value(true),
+          isSynced: const Value(true),
+        ),
+      );
+
+      await _pullMedsAndReminders(
+        firestorePatientId: patientDocId,
+        localPatientId: localId,
+      );
+
+      // PIN already set → send straight to login.
+      return AuthSuccess(localId, needsPinSetup: existingPin.isEmpty);
+    }
+
+    // ── First activation ───────────────────────────────────────────────────
     // Check if we already created a local record during a previous attempt.
-    var patient = await _db.patientsDao.getPatientByActivationCode(code);
+    final patient = await _db.patientsDao.getPatientByActivationCode(code);
     if (patient != null) {
       return AuthSuccess(patient.id);
     }
@@ -84,8 +128,7 @@ class AuthRepository {
 
     final localId = await _db.patientsDao.insertPatient(
       PatientsCompanion(
-        registrationCode:
-            Value(pd['registrationCode'] as String? ?? ''),
+        registrationCode: Value(pd['registrationCode'] as String? ?? ''),
         fullName: Value(pd['fullName'] as String? ?? ''),
         phoneNumber: const Value(''),
         dateOfBirth: const Value(''),
@@ -102,7 +145,7 @@ class AuthRepository {
     // Pull medications and reminders so the patient sees their schedule
     // immediately after PIN setup.
     await _pullMedsAndReminders(
-      firestorePatientId: int.tryParse(patientDocId) ?? 0,
+      firestorePatientId: patientDocId,
       localPatientId: localId,
     );
 
@@ -125,20 +168,21 @@ class AuthRepository {
   }
 
   /// Pulls all medications and reminders for a patient from Firestore and
-  /// inserts them into the local Drift DB, remapping patient/medication IDs.
+  /// inserts them into the local Drift DB, remapping medication IDs.
+  /// [firestorePatientId] is the Firestore document ID string for the patient.
   Future<void> _pullMedsAndReminders({
-    required int firestorePatientId,
+    required String firestorePatientId,
     required int localPatientId,
   }) async {
     final fs = FirebaseFirestore.instance;
 
     final medSnap = await fs
         .collection(kColMedications)
-        .where('patientId', isEqualTo: firestorePatientId)
+        .where('patientFirestoreDocId', isEqualTo: firestorePatientId)
         .get();
 
-    // firestoreMedLocalId → new local Drift medId
-    final medIdMap = <int, int>{};
+    // Firestore med doc ID → new local Drift medId
+    final medIdMap = <String, int>{};
 
     for (final doc in medSnap.docs) {
       final d = doc.data();
@@ -157,18 +201,18 @@ class AuthRepository {
           isSynced: const Value(true),
         ),
       );
-      medIdMap[d['localId'] as int? ?? 0] = newMedId;
+      medIdMap[doc.id] = newMedId;
     }
 
     final remSnap = await fs
         .collection(kColReminders)
-        .where('patientId', isEqualTo: firestorePatientId)
+        .where('patientFirestoreDocId', isEqualTo: firestorePatientId)
         .get();
 
     for (final doc in remSnap.docs) {
       final d = doc.data();
-      final oldMedId = d['medicationId'] as int? ?? 0;
-      final newMedId = medIdMap[oldMedId];
+      final medDocId = d['medicationFirestoreDocId'] as String? ?? '';
+      final newMedId = medIdMap[medDocId];
       if (newMedId == null) continue;
 
       await _db.remindersDao.insertReminder(
@@ -176,8 +220,7 @@ class AuthRepository {
           patientId: Value(localPatientId),
           medicationId: Value(newMedId),
           scheduledTime: Value(d['scheduledTime'] as String? ?? '08:00'),
-          deliveryChannel:
-              Value(d['deliveryChannel'] as String? ?? 'push'),
+          deliveryChannel: Value(d['deliveryChannel'] as String? ?? 'push'),
           isActive: Value(d['isActive'] as bool? ?? true),
           isSynced: const Value(true),
         ),
@@ -195,37 +238,44 @@ class AuthRepository {
       await _db.patientsDao.updatePinHash(patientId, hash);
       await _db.patientsDao.markAsActivated(patientId);
 
-      // Mark the Firestore activation_codes document as used.
+      // Push PIN hash + activation status to Firestore.
       if (kFirebaseConfigured) {
         final patient = await _db.patientsDao.getPatientById(patientId);
         if (patient?.activationCode != null) {
           try {
             final fs = FirebaseFirestore.instance;
             final activationCode = patient!.activationCode!;
-            await fs
+
+            // Look up the patient's Firestore document ID from the activation
+            // code doc — this is guaranteed to exist and avoids a field query.
+            final codeDoc = await fs
                 .collection(kColActivationCodes)
                 .doc(activationCode)
-                .update({
-              'isActivated': true,
-              'activatedAt': FieldValue.serverTimestamp(),
-            });
-            // Also reflect in the patients document.
-            await fs
-                .collection(kColPatients)
-                .where('activationCode', isEqualTo: activationCode)
-                .limit(1)
-                .get()
-                .then((snap) {
-              for (final doc in snap.docs) {
-                doc.reference.update({
+                .get();
+
+            if (codeDoc.exists) {
+              final patientDocId =
+                  codeDoc.data()!['patientFirestoreDocId'] as String?;
+
+              if (patientDocId != null) {
+                // Write pinHash directly to the patient document so other
+                // devices can pull it when the user enters the same code.
+                await fs.collection(kColPatients).doc(patientDocId).update({
+                  'pinHash': hash,
                   'isActivated': true,
                   'activatedAt': FieldValue.serverTimestamp(),
                 });
               }
-            });
+
+              // Mark the activation code as used.
+              await codeDoc.reference.update({
+                'isActivated': true,
+                'activatedAt': FieldValue.serverTimestamp(),
+              });
+            }
           } catch (_) {
-            // Firestore update failed — the row is already marked isSynced=false
-            // so sync_service will retry on next connectivity restore.
+            // Firestore write failed — isSynced=false ensures sync_service
+            // retries on next connectivity restore.
           }
         }
       }

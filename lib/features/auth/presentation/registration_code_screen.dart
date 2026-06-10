@@ -34,9 +34,13 @@ class _RegistrationCodeScreenState extends State<RegistrationCodeScreen> {
     setState(() => _loading = false);
 
     switch (result) {
-      case AuthSuccess(:final patientId):
-        print('ACTIVATED PATIENT ID: $patientId');
-        context.go('/pin-setup', extra: patientId);
+      case AuthSuccess(:final patientId, :final needsPinSetup):
+        if (needsPinSetup) {
+          context.go('/pin-setup', extra: patientId);
+        } else {
+          // Account already exists (second device / reinstall) — go to login.
+          context.go('/login');
+        }
       case AuthFailure(:final message):
         setState(() => _error = message);
     }
