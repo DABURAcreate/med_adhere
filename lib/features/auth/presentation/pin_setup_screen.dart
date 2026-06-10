@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../app/router.dart';
 import '../../../providers/session_provider.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
@@ -45,9 +46,9 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     setState(() => _loading = false);
 
     switch (result) {
-      case AuthSuccess(:final patientId):
-        context.read<SessionProvider>().signInAsPatient(patientId);
-        context.go('/patient/home');
+      case AuthSuccess(:final userId):
+        context.read<SessionProvider>().signInAsPatient(int.parse(userId));
+        context.go(AppRoutes.patientHome);
       case AuthFailure(:final message):
         setState(() => _error = message);
     }

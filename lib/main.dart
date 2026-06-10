@@ -41,19 +41,26 @@ Future<void> main() async {
   final patientRepo = PatientRepository(db: db);
   final adherenceRepo = AdherenceRepository(db: db, riskEngine: riskEngine);
   final dashboardRepo = DashboardRepository(db: db);
-  final authRepo = AuthRepository(db: db);
+  final authRepo = AuthRepository(db: db, connectivity: connectivity);
   final patientMgmtRepo = PatientMgmtRepository(db: db);
 
   // Restore previous session if one was saved on disk.
   final session = SessionProvider();
-  final savedId = await AuthService.loadSession();
-  if (savedId != null) {
-    final patient = await db.patientsDao.getPatientById(savedId);
-    if (patient != null) {
-      session.signInAsPatient(savedId);
-    } else {
-      // DB was cleared — discard stale session file.
-      await AuthService.clearSession();
+  final savedSession = await AuthService.loadSession();
+  if (savedSession != null) {
+    if (savedSession.role == 'patient' && savedSession.patientId != null) {
+      final patient =
+          await db.patientsDao.getPatientById(savedSession.patientId!);
+      if (patient != null) {
+        session.signInAsPatient(savedSession.patientId!);
+      } else {
+        // Local DB was cleared — discard stale session file.
+        await AuthService.clearSession();
+      }
+    } else if (savedSession.role == 'worker' &&
+        savedSession.workerId != null) {
+      // Workers are stored in Firestore; trust the session file on startup.
+      session.signInAsWorker(savedSession.workerId!);
     }
   }
 

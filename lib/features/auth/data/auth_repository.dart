@@ -1,17 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/network/connectivity_service.dart';
 import '../../../core/security/auth_service.dart';
 import '../../../core/utils/constants.dart';
 import '../domain/auth_models.dart';
 
 /// All authentication operations — registration code validation, PIN setup,
-/// and PIN login.
+/// PIN login, and worker registration.
 class AuthRepository {
   final AppDatabase _db;
+  final ConnectivityService _connectivity;
 
-  const AuthRepository({required AppDatabase db}) : _db = db;
+  AuthRepository({
+    required AppDatabase db,
+    required ConnectivityService connectivity,
+  })  : _db = db,
+        _connectivity = connectivity;
 
   // ── Existing-user check ────────────────────────────────────────────────────
 
@@ -56,63 +63,18 @@ class AuthRepository {
     }
 
     final codeData = codeDoc.data()!;
-    final patientDocId = codeData['patientFirestoreDocId'] as String;
-
-    // ── Already activated ──────────────────────────────────────────────────
-    // The account exists in Firestore. This device may be a second device or
-    // a reinstall — pull the full patient record (including pinHash) so the
-    // user can log in with their existing PIN without going through setup again.
     if (codeData['isActivated'] == true) {
-      // If we already have a local record (e.g. mid-registration retry), reuse it.
-      final existing = await _db.patientsDao.getPatientByActivationCode(code);
-      if (existing != null) {
-        final needsSetup = existing.pinHash.isEmpty;
-        return AuthSuccess(existing.id, needsPinSetup: needsSetup);
-      }
-
-      // Pull the patient document from Firestore, including the pinHash that
-      // was saved when the account was first activated.
-      final patientDoc =
-          await fs.collection(kColPatients).doc(patientDocId).get();
-      if (!patientDoc.exists) {
-        return const AuthFailure(
-          'Patient record not found. Please contact your clinic.',
-        );
-      }
-
-      final pd = patientDoc.data()!;
-      final existingPin = pd['pinHash'] as String? ?? '';
-
-      final localId = await _db.patientsDao.insertPatient(
-        PatientsCompanion(
-          registrationCode: Value(pd['registrationCode'] as String? ?? ''),
-          fullName: Value(pd['fullName'] as String? ?? ''),
-          phoneNumber: Value(pd['phoneNumber'] as String? ?? ''),
-          dateOfBirth: Value(pd['dateOfBirth'] as String? ?? ''),
-          gender: Value(pd['gender'] as String? ?? 'other'),
-          pinHash: Value(existingPin),
-          activationCode: Value(code),
-          conditions: Value(pd['conditions'] as String?),
-          caregiverPhone: Value(pd['caregiverPhone'] as String?),
-          isActivated: const Value(true),
-          isSynced: const Value(true),
-        ),
+      return const AuthFailure(
+        'This activation code has already been used.',
       );
-
-      await _pullMedsAndReminders(
-        firestorePatientId: patientDocId,
-        localPatientId: localId,
-      );
-
-      // PIN already set → send straight to login.
-      return AuthSuccess(localId, needsPinSetup: existingPin.isEmpty);
     }
 
-    // ── First activation ───────────────────────────────────────────────────
+    final patientDocId = codeData['patientFirestoreDocId'] as String;
+
     // Check if we already created a local record during a previous attempt.
-    final patient = await _db.patientsDao.getPatientByActivationCode(code);
+    var patient = await _db.patientsDao.getPatientByActivationCode(code);
     if (patient != null) {
-      return AuthSuccess(patient.id);
+      return AuthSuccess(role: AuthRole.patient, userId: patient.id.toString());
     }
 
     // Pull patient document from Firestore.
@@ -145,11 +107,11 @@ class AuthRepository {
     // Pull medications and reminders so the patient sees their schedule
     // immediately after PIN setup.
     await _pullMedsAndReminders(
-      firestorePatientId: patientDocId,
+      firestorePatientId: int.tryParse(patientDocId) ?? 0,
       localPatientId: localId,
     );
 
-    return AuthSuccess(localId);
+    return AuthSuccess(role: AuthRole.patient, userId: localId.toString());
   }
 
   Future<AuthResult> _lookupFromLocalDb(String code) async {
@@ -164,25 +126,23 @@ class AuthRepository {
         'This activation code has already been used.',
       );
     }
-    return AuthSuccess(patient.id);
+    return AuthSuccess(role: AuthRole.patient, userId: patient.id.toString());
   }
 
   /// Pulls all medications and reminders for a patient from Firestore and
-  /// inserts them into the local Drift DB, remapping medication IDs.
-  /// [firestorePatientId] is the Firestore document ID string for the patient.
+  /// inserts them into the local Drift DB, remapping patient/medication IDs.
   Future<void> _pullMedsAndReminders({
-    required String firestorePatientId,
+    required int firestorePatientId,
     required int localPatientId,
   }) async {
     final fs = FirebaseFirestore.instance;
 
     final medSnap = await fs
         .collection(kColMedications)
-        .where('patientFirestoreDocId', isEqualTo: firestorePatientId)
+        .where('patientId', isEqualTo: firestorePatientId)
         .get();
 
-    // Firestore med doc ID → new local Drift medId
-    final medIdMap = <String, int>{};
+    final medIdMap = <int, int>{};
 
     for (final doc in medSnap.docs) {
       final d = doc.data();
@@ -201,18 +161,18 @@ class AuthRepository {
           isSynced: const Value(true),
         ),
       );
-      medIdMap[doc.id] = newMedId;
+      medIdMap[d['localId'] as int? ?? 0] = newMedId;
     }
 
     final remSnap = await fs
         .collection(kColReminders)
-        .where('patientFirestoreDocId', isEqualTo: firestorePatientId)
+        .where('patientId', isEqualTo: firestorePatientId)
         .get();
 
     for (final doc in remSnap.docs) {
       final d = doc.data();
-      final medDocId = d['medicationFirestoreDocId'] as String? ?? '';
-      final newMedId = medIdMap[medDocId];
+      final oldMedId = d['medicationId'] as int? ?? 0;
+      final newMedId = medIdMap[oldMedId];
       if (newMedId == null) continue;
 
       await _db.remindersDao.insertReminder(
@@ -231,14 +191,14 @@ class AuthRepository {
   // ── PIN setup ──────────────────────────────────────────────────────────────
 
   /// Hashes [pin], stores it on the patient record, marks the activation code
-  /// as used in both Drift and Firestore, then saves the local session.
+  /// as used, saves the PIN hash to Firestore for cross-device recovery, then
+  /// persists the local session.
   Future<AuthResult> setupPin(int patientId, String pin) async {
     try {
       final hash = AuthService.hashPin(pin);
       await _db.patientsDao.updatePinHash(patientId, hash);
       await _db.patientsDao.markAsActivated(patientId);
 
-      // Push PIN hash + activation status to Firestore.
       if (kFirebaseConfigured) {
         final patient = await _db.patientsDao.getPatientById(patientId);
         if (patient?.activationCode != null) {
@@ -246,36 +206,38 @@ class AuthRepository {
             final fs = FirebaseFirestore.instance;
             final activationCode = patient!.activationCode!;
 
-            // Look up the patient's Firestore document ID from the activation
-            // code doc — this is guaranteed to exist and avoids a field query.
-            final codeDoc = await fs
+            // Mark the activation code as used.
+            await fs
                 .collection(kColActivationCodes)
                 .doc(activationCode)
-                .get();
+                .update({
+              'isActivated': true,
+              'activatedAt': FieldValue.serverTimestamp(),
+            });
 
-            if (codeDoc.exists) {
-              final patientDocId =
-                  codeDoc.data()!['patientFirestoreDocId'] as String?;
-
-              if (patientDocId != null) {
-                // Write pinHash directly to the patient document so other
-                // devices can pull it when the user enters the same code.
-                await fs.collection(kColPatients).doc(patientDocId).update({
-                  'pinHash': hash,
+            // Update the patient document: mark activated AND store pinHash
+            // so the patient can recover their account from a new device.
+            await fs
+                .collection(kColPatients)
+                .where('activationCode', isEqualTo: activationCode)
+                .limit(1)
+                .get()
+                .then((snap) {
+              for (final doc in snap.docs) {
+                doc.reference.update({
                   'isActivated': true,
                   'activatedAt': FieldValue.serverTimestamp(),
+                  'pinHash': hash,
+                  'updatedAt': FieldValue.serverTimestamp(),
                 });
               }
-
-              // Mark the activation code as used.
-              await codeDoc.reference.update({
-                'isActivated': true,
-                'activatedAt': FieldValue.serverTimestamp(),
-              });
-            }
+            });
           } catch (_) {
-            // Firestore write failed — isSynced=false ensures sync_service
-            // retries on next connectivity restore.
+            // Firestore update failed — the local record is already updated.
+            // SyncService will push isSynced=false rows on next connectivity
+            // restore, but pinHash is intentionally excluded from that sync.
+            // If recovery is needed before the next online session, the patient
+            // will need to re-enter their activation code.
           }
         }
       }
@@ -284,8 +246,8 @@ class AuthRepository {
         patientId,
         PatientsCompanion(isSynced: const Value(false)),
       );
-      await AuthService.saveSession(patientId);
-      return AuthSuccess(patientId);
+      await AuthService.saveSession(patientId: patientId);
+      return AuthSuccess(role: AuthRole.patient, userId: patientId.toString());
     } catch (e) {
       return AuthFailure('Could not save PIN: $e');
     }
@@ -293,28 +255,208 @@ class AuthRepository {
 
   // ── PIN login ──────────────────────────────────────────────────────────────
 
-  /// Finds the activated patient on this device and verifies their PIN.
+  /// Login order:
+  ///   1. Local Drift patients (offline-capable, primary path).
+  ///   2. Firestore workers (online; workers are cloud-only).
+  ///   3. Firestore patients (online; recovery for new/reinstalled devices).
+  ///
+  /// The Firestore patient fallback stores the hash in Firestore so that
+  /// patients can sign in on a replacement device without their activation code.
+  ///
+  /// SECURITY NOTE: querying by PIN hash alone is safe for a single-user local
+  /// DB, but on Firestore two patients could share the same 4-digit PIN.
+  /// For production recovery, combine PIN with a second identifier such as
+  /// the registration code or a phone number OTP.
   Future<AuthResult> login(String pin) async {
     try {
-      final all = await _db.patientsDao.getAllPatients();
-      if (all.isEmpty) {
-        return const AuthFailure('No account found. Please register first.');
+      final pinHash = AuthService.hashPin(pin);
+      debugPrint('[Auth] Local login attempt started.');
+
+      // ── Phase 1: local Drift patients ──────────────────────────────────────
+      final patients = await _db.patientsDao.getAllPatients();
+      for (final patient in patients) {
+        if (patient.pinHash.isNotEmpty && patient.pinHash == pinHash) {
+          debugPrint('[Auth] Patient found locally (id=${patient.id}).');
+          await AuthService.saveSession(patientId: patient.id);
+          return AuthSuccess(
+            role: AuthRole.patient,
+            userId: patient.id.toString(),
+          );
+        }
       }
-      // Use the first activated patient on the device.
-      final patient = all.firstWhere(
-        (p) => p.pinHash.isNotEmpty,
-        orElse: () => all.first,
-      );
-      if (patient.pinHash.isEmpty) {
-        return const AuthFailure('PIN not set. Please complete registration.');
+      debugPrint('[Auth] No local patient match.');
+
+      // ── Phase 2 & 3: Firestore fallback (requires connectivity) ───────────
+      if (!kFirebaseConfigured) {
+        return patients.isEmpty
+            ? const AuthFailure('No account found. Please register first.')
+            : const AuthFailure('Incorrect PIN. Please try again.');
       }
-      if (!AuthService.verifyPin(pin, patient.pinHash)) {
-        return const AuthFailure('Incorrect PIN. Please try again.');
+
+      final connected = await _connectivity.isConnected;
+      if (!connected) {
+        debugPrint('[Auth] Offline — Firestore fallback skipped.');
+        return patients.isEmpty
+            ? const AuthFailure(
+                'No local account found. Connect to the internet to restore your account.',
+              )
+            : const AuthFailure('Incorrect PIN. Please try again.');
       }
-      await AuthService.saveSession(patient.id);
-      return AuthSuccess(patient.id);
+
+      final fs = FirebaseFirestore.instance;
+
+      // ── Phase 2: Firestore workers ─────────────────────────────────────────
+      debugPrint('[Auth] Checking Firestore workers...');
+      final workerSnap = await fs
+          .collection(kColWorkers)
+          .where('pinHash', isEqualTo: pinHash)
+          .limit(1)
+          .get();
+      if (workerSnap.docs.isNotEmpty) {
+        final workerId = workerSnap.docs.first.id;
+        debugPrint('[Auth] Worker found in Firestore (id=$workerId).');
+        await AuthService.saveSession(workerId: workerId);
+        return AuthSuccess(role: AuthRole.worker, userId: workerId);
+      }
+      debugPrint('[Auth] No Firestore worker match.');
+
+      // ── Phase 3: Firestore patient recovery (new / reinstalled device) ─────
+      debugPrint('[Auth] Checking Firestore patients for recovery...');
+      final patientSnap = await fs
+          .collection(kColPatients)
+          .where('pinHash', isEqualTo: pinHash)
+          .where('isActivated', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (patientSnap.docs.isNotEmpty) {
+        debugPrint('[Auth] Patient found in Firestore — caching locally...');
+        final localId = await _cachePatientLocally(patientSnap.docs.first);
+        await AuthService.saveSession(patientId: localId);
+        return AuthSuccess(role: AuthRole.patient, userId: localId.toString());
+      }
+      debugPrint('[Auth] No Firestore patient match.');
+
+      return patients.isEmpty
+          ? const AuthFailure('No account found. Please register first.')
+          : const AuthFailure('Incorrect PIN. Please try again.');
     } catch (e) {
       return AuthFailure('Login failed: $e');
+    }
+  }
+
+  /// Downloads a Firestore patient document into the local Drift DB.
+  ///
+  /// Checks for an existing local record by registration code first to avoid
+  /// duplicates. If the patient already exists locally (e.g., stale session was
+  /// cleared but the DB wasn't), it refreshes the stored PIN hash and returns
+  /// the existing local ID.
+  ///
+  /// After inserting, attempts to pull medications and reminders from Firestore
+  /// using the Firestore-side [localId] field so the patient sees their schedule
+  /// immediately.
+  Future<int> _cachePatientLocally(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) async {
+    final data = doc.data();
+    final regCode = data['registrationCode'] as String? ?? '';
+
+    // Avoid creating a duplicate if this patient is already in local DB.
+    final existing = await _db.patientsDao.getPatientByRegistrationCode(regCode);
+    if (existing != null) {
+      final remoteHash = data['pinHash'] as String? ?? '';
+      if (existing.pinHash != remoteHash && remoteHash.isNotEmpty) {
+        await _db.patientsDao.updatePinHash(existing.id, remoteHash);
+      }
+      debugPrint('[Auth] Patient already cached locally (id=${existing.id}).');
+      return existing.id;
+    }
+
+    final localId = await _db.patientsDao.insertPatient(
+      PatientsCompanion(
+        registrationCode: Value(regCode),
+        fullName: Value(data['fullName'] as String? ?? ''),
+        phoneNumber: const Value(''),
+        dateOfBirth: const Value(''),
+        gender: const Value('other'),
+        pinHash: Value(data['pinHash'] as String? ?? ''),
+        activationCode: Value(data['activationCode'] as String?),
+        conditions: Value(data['conditions'] as String?),
+        caregiverPhone: Value(data['caregiverPhone'] as String?),
+        riskLevel: Value(data['riskLevel'] as String? ?? kRiskLow),
+        isActivated: const Value(true),
+        isSynced: const Value(true),
+      ),
+    );
+
+    // Pull medications + reminders using the Firestore document's stored localId
+    // (which is the original local ID from the worker's device).
+    final firestoreLocalId = data['localId'] as int?;
+    if (firestoreLocalId != null) {
+      try {
+        await _pullMedsAndReminders(
+          firestorePatientId: firestoreLocalId,
+          localPatientId: localId,
+        );
+        debugPrint('[Auth] Medications/reminders pulled for restored patient.');
+      } catch (_) {
+        // Non-fatal: the patient is signed in; they may see an empty schedule
+        // until the next sync cycle pulls their data.
+        debugPrint('[Auth] Could not pull medications — schedule may be empty initially.');
+      }
+    }
+
+    return localId;
+  }
+
+  // ── Worker registration ────────────────────────────────────────────────────
+
+  /// Creates a new worker document in Firestore.
+  ///
+  /// Validates that [staffNumber] is unique before writing.
+  /// [pin] is hashed with the same SHA-256 method used for patients.
+  Future<AuthResult> registerWorker({
+    required String fullName,
+    required String staffNumber,
+    String? clinicName,
+    required String pin,
+  }) async {
+    try {
+      if (!kFirebaseConfigured) {
+        return const AuthFailure(
+          'Worker registration requires an internet connection.',
+        );
+      }
+
+      final fs = FirebaseFirestore.instance;
+
+      // Enforce unique staff number.
+      final existing = await fs
+          .collection(kColWorkers)
+          .where('staffNumber', isEqualTo: staffNumber.trim())
+          .limit(1)
+          .get();
+      if (existing.docs.isNotEmpty) {
+        return const AuthFailure(
+          'A worker with this staff number already exists.',
+        );
+      }
+
+      final pinHash = AuthService.hashPin(pin);
+      final docRef = await fs.collection(kColWorkers).add({
+        'fullName': fullName.trim(),
+        'staffNumber': staffNumber.trim(),
+        if (clinicName != null && clinicName.trim().isNotEmpty)
+          'clinicName': clinicName.trim(),
+        'pinHash': pinHash,
+        'role': 'worker',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return AuthSuccess(role: AuthRole.worker, userId: docRef.id);
+    } catch (e) {
+      return AuthFailure('Registration failed: $e');
     }
   }
 }

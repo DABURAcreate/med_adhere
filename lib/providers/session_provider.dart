@@ -1,35 +1,41 @@
 import 'package:flutter/foundation.dart';
 
+import '../features/auth/domain/auth_models.dart';
+
 /// Holds the identity of the currently authenticated user.
 ///
 /// Set by the auth flow after PIN verification.
 /// Cleared on logout.
-///
-/// Screens that need the current patient id read:
-///   context.read[SessionProvider]().currentPatientId
 class SessionProvider extends ChangeNotifier {
   int? _currentPatientId;
-  String _role = 'patient'; // 'patient' | 'worker'
+  String? _currentWorkerId;
+  AuthRole? _role;
 
   int? get currentPatientId => _currentPatientId;
-  String get role => _role;
-  bool get isAuthenticated => _currentPatientId != null;
+  String? get currentWorkerId => _currentWorkerId;
+  AuthRole? get role => _role;
+  bool get isAuthenticated => _role != null;
+  bool get isPatient => _role == AuthRole.patient;
+  bool get isWorker => _role == AuthRole.worker;
 
   void signInAsPatient(int patientId) {
     _currentPatientId = patientId;
-    _role = 'patient';
+    _currentWorkerId = null;
+    _role = AuthRole.patient;
     notifyListeners();
   }
 
-  void signInAsWorker() {
+  void signInAsWorker(String workerId) {
     _currentPatientId = null;
-    _role = 'worker';
+    _currentWorkerId = workerId;
+    _role = AuthRole.worker;
     notifyListeners();
   }
 
   void signOut() {
     _currentPatientId = null;
-    _role = 'patient';
+    _currentWorkerId = null;
+    _role = null;
     notifyListeners();
   }
 }

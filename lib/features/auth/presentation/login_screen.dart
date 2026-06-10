@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
+import '../../../app/router.dart';
 import '../../../providers/session_provider.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
@@ -35,9 +36,14 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     switch (result) {
-      case AuthSuccess(:final patientId):
-        context.read<SessionProvider>().signInAsPatient(patientId);
-        context.go('/patient/home');
+      case AuthSuccess(:final role, :final userId):
+        if (role == AuthRole.worker) {
+          context.read<SessionProvider>().signInAsWorker(userId);
+          context.go(AppRoutes.dashboard);
+        } else {
+          context.read<SessionProvider>().signInAsPatient(int.parse(userId));
+          context.go(AppRoutes.patientHome);
+        }
       case AuthFailure(:final message):
         setState(() => _error = message);
     }
@@ -98,6 +104,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       : ContinueButton(
                           onPressed: _pin.length == 4 ? _onContinue : null,
                         ),
+                ),
+              ),
+
+              const Spacer(),
+
+              // Worker registration entry point
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: TextButton(
+                  onPressed: () => context.push(AppRoutes.workerRegistration),
+                  child: const Text(
+                    'Register as Healthcare Worker',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF165B9E),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],

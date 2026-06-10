@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Handles PIN hashing and the on-disk session token (current patient ID).
+/// Handles PIN hashing and the on-disk session token.
 ///
 /// PIN storage uses SHA-256. This is acceptable for a 4-digit device PIN
 /// because the threat model is device-local; the hash is never transmitted.
@@ -26,19 +26,40 @@ class AuthService {
 
   // ── Persisted session ─────────────────────────────────────────────────────
 
-  /// Saves the patient ID to disk so it survives app restarts.
-  static Future<void> saveSession(int patientId) async {
+  /// Saves the current session to disk so it survives app restarts.
+  /// Pass either [patientId] (for patients) or [workerId] (for workers).
+  static Future<void> saveSession({int? patientId, String? workerId}) async {
     final file = await _sessionFile();
-    file.writeAsStringSync(jsonEncode({'patientId': patientId}));
+    final data = <String, dynamic>{};
+    if (patientId != null) {
+      data['patientId'] = patientId;
+      data['role'] = 'patient';
+    } else if (workerId != null) {
+      data['workerId'] = workerId;
+      data['role'] = 'worker';
+    }
+    file.writeAsStringSync(jsonEncode(data));
   }
 
-  /// Returns the stored patient ID, or null if no session exists.
-  static Future<int?> loadSession() async {
+  /// Returns the stored session, or null if no valid session exists.
+  /// Handles the legacy format (patient-only, no role field).
+  static Future<({String role, int? patientId, String? workerId})?> loadSession() async {
     try {
       final file = await _sessionFile();
       if (!file.existsSync()) return null;
       final data = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-      return data['patientId'] as int?;
+
+      final role = data['role'] as String? ?? 'patient';
+      final patientId = data['patientId'] as int?;
+      final workerId = data['workerId'] as String?;
+
+      if (role == 'patient' && patientId != null) {
+        return (role: 'patient', patientId: patientId, workerId: null);
+      }
+      if (role == 'worker' && workerId != null) {
+        return (role: 'worker', patientId: null, workerId: workerId);
+      }
+      return null;
     } catch (_) {
       return null;
     }

@@ -28,3 +28,5 @@ const String kColReminders = 'reminders';
 const String kColAdherenceLogs = 'adherence_logs';
 // Stores one document per activation code (doc ID = code) for O(1) patient lookup.
 const String kColActivationCodes = 'activation_codes';
+// Stores healthcare worker accounts (doc ID = Firestore auto-ID).
+const String kColWorkers = 'workers';

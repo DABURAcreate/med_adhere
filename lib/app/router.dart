@@ -7,6 +7,7 @@ import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/pin_setup_screen.dart';
 import '../features/auth/presentation/language_screen.dart';
 import '../features/auth/presentation/registration_code_screen.dart';
+import '../features/auth/presentation/register_worker_screen.dart';
 
 // Patient
 import '../features/patient/presentation/home_screen.dart';
@@ -42,6 +43,7 @@ class AppRoutes {
   static const login = '/login';
   static const pinSetup = '/pin-setup';
   static const registrationCode = '/registration-code';
+  static const workerRegistration = '/register-worker';
 
   // Patient
   static const patientHome = '/patient/home';
@@ -67,6 +69,7 @@ class AppRoutes {
     '/login',
     '/registration-code',
     '/pin-setup',
+    '/register-worker',
   };
 
   static bool isAuthRoute(String path) => _authRoutes.contains(path);
@@ -97,6 +100,11 @@ class AppRouter {
       path: AppRoutes.registrationCode,
       name: 'registrationCode',
       builder: (context, state) => const RegistrationCodeScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.workerRegistration,
+      name: 'workerRegistration',
+      builder: (context, state) => const RegisterWorkerScreen(),
     ),
 
     // ---------- Patient ----------
@@ -189,25 +197,41 @@ class AppRouter {
     ),
   ];
 
-  /// Redirects authenticated users away from auth screens to their home.
+  /// Redirects users based on authentication state and role.
+  ///
+  /// Rules:
+  ///   - Auth routes (login, language, etc.): authenticated users are sent to
+  ///     their role-specific home.
+  ///   - Protected routes: unauthenticated users are sent to login.
+  ///   - /patient/* routes: workers are redirected to the dashboard.
+  ///   - /worker/* routes: patients are redirected to patient home.
   static String? redirect(BuildContext context, GoRouterState state) {
     final session = context.read<SessionProvider>();
     final isAuth = session.isAuthenticated;
+    final path = state.uri.path;
 
-    // Always allow language screen
-    if (state.uri.path == AppRoutes.language ||
-        state.uri.path == AppRoutes.registrationCode ||
-        state.uri.path == AppRoutes.pinSetup) {
+    final isAuthRoute = AppRoutes.isAuthRoute(path);
+
+    if (isAuthRoute) {
+      // Authenticated users don't need auth screens — send to their home.
+      /*if (!isAuth) return null;
+      return session.isWorker ? AppRoutes.dashboard : AppRoutes.patientHome;*/
       return null;
     }
 
-    final onAuthRoute = AppRoutes.isAuthRoute(state.uri.path);
+    // All non-auth routes require authentication.
+    if (!isAuth) return AppRoutes.login;
 
-    if (isAuth && onAuthRoute) {
-      return session.role == 'worker'
-          ? AppRoutes.dashboard
-          : AppRoutes.patientHome;
+    // Workers cannot access patient-only routes.
+    if (session.isWorker && path.startsWith('/patient/')) {
+      return AppRoutes.dashboard;
     }
+
+    // Patients cannot access worker-only routes.
+    if (session.isPatient && path.startsWith('/worker/')) {
+      return AppRoutes.patientHome;
+    }
+
     return null;
   }
 }
