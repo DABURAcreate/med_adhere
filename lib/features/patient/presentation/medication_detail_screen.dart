@@ -1,6 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../providers/session_provider.dart';
+import '../data/patient_repository.dart';
 import '../widgets/scaffold.dart';
 
+/// Shows all active medications for the current patient.
+/// The [medicationId] URL parameter is ignored — this screen serves as the
+/// Meds tab and lists every medication assigned to the logged-in patient.
 class MedicationDetailScreen extends StatelessWidget {
   final String medicationId;
 
@@ -11,8 +19,20 @@ class MedicationDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final patientId = context.watch<SessionProvider>().currentPatientId;
+
+    if (patientId == null) {
+      return const MainScaffold(
+        title: 'Medications',
+        currentIndex: 2,
+        body: Center(child: Text('No patient session found.')),
+      );
+    }
+
+    final patientRepo = context.read<PatientRepository>();
+
     return MainScaffold(
-      title: 'Medication Detail',
+      title: 'Medications',
       currentIndex: 2,
       body: Container(
         color: Colors.white,
@@ -21,33 +41,74 @@ class MedicationDetailScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 💊 Medications label
-             
-                Center(
-    child: const Text(
-    'Medications',
-    style: TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.bold,
-      color: Colors.black,
-    ),
-  ),
-),
-          
-                  
-               
-                
-            
-             
-
+              const Center(
+                child: Text(
+                  'Medications',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
-
-              // 📜 Scrollable content
               Expanded(
-                child: ListView(
-                  children: const [
-                    MedicationCard(),
-                  ],
+                child: StreamBuilder<List<Medication>>(
+                  stream: patientRepo.watchMedications(patientId),
+                  builder: (context, medSnap) {
+                    if (medSnap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final meds = medSnap.data ?? [];
+                    final activeMeds =
+                        meds.where((m) => m.isActive).toList();
+
+                    if (activeMeds.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No medications assigned yet.',
+                          style: TextStyle(color: Colors.grey, fontSize: 15),
+                        ),
+                      );
+                    }
+
+                    return StreamBuilder<List<Reminder>>(
+                      stream: patientRepo.watchRemindersForPatient(patientId),
+                      builder: (context, remSnap) {
+                        final allReminders = remSnap.data ?? [];
+                        final remindersByMed = <int, List<Reminder>>{};
+                        for (final r in allReminders) {
+                          if (r.isActive) {
+                            remindersByMed
+                                .putIfAbsent(r.medicationId, () => [])
+                                .add(r);
+                          }
+                        }
+
+                        return ListView.separated(
+                          itemCount: activeMeds.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            final med = activeMeds[index];
+                            final times = remindersByMed[med.id]
+                                    ?.map((r) => r.scheduledTime)
+                                    .toList() ??
+                                [];
+                            return MedicationCard(
+                              number: index + 1,
+                              name: med.name,
+                              dosage: med.dosage,
+                              instructions: med.instructions,
+                              doseTimes: times,
+                              isActive: med.isActive,
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -58,14 +119,31 @@ class MedicationDetailScreen extends StatelessWidget {
   }
 }
 
+// =============================================================================
+// Medication card
+// =============================================================================
+
 class MedicationCard extends StatelessWidget {
-  const MedicationCard({super.key});
+  final int number;
+  final String name;
+  final String dosage;
+  final String? instructions;
+  final List<String> doseTimes;
+  final bool isActive;
+
+  const MedicationCard({
+    super.key,
+    required this.number,
+    required this.name,
+    required this.dosage,
+    this.instructions,
+    required this.doseTimes,
+    required this.isActive,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 353,
-      height: 546,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1A7E95), Color(0xFF165B9E)],
@@ -90,23 +168,23 @@ class MedicationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 💊 Title
-          const Text(
-            '1. Metformin',
-            style: TextStyle(
+          // Title
+          Text(
+            '$number. $name',
+            style: const TextStyle(
               color: Colors.white,
-              fontSize: 26,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
-          // 🖼️ Medication Image
+          // Medication image
           Center(
             child: Container(
-              width: 120,
-              height: 120,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -117,81 +195,108 @@ class MedicationCard extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // 🏷️ For: label
+          // Dosage
+          Text(
+            'Dosage: $dosage',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          if (!isActive) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'INACTIVE',
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // Schedule section
           const Text(
-            'For: Diabetes',
+            'Your Schedule:',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
-
-          const SizedBox(height: 14),
-
-          // 📅 Your Schedule section
-          const Text(
-            'Your Schedule:',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
           const SizedBox(height: 10),
 
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFF0F5F6E),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _ScheduleRow(time: '8:00 am', dose: '1 tablet'),
-                SizedBox(height: 8),
-                _ScheduleRow(time: '8:00 pm', dose: '1 tablet'),
-              ],
-            ),
+            child: doseTimes.isEmpty
+                ? const Text(
+                    'No scheduled times yet.',
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < doseTimes.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 8),
+                        _ScheduleRow(
+                          time: doseTimes[i],
+                          dose: dosage,
+                        ),
+                      ],
+                    ],
+                  ),
           ),
 
-          const SizedBox(height: 18),
-
-          // 💡 How to Take section
-          const Text(
-            'How to Take:',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          const SizedBox(height: 10),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F5F6E),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'Take each tablet with water\nafter a meal. Breakfast / Supper',
-              textAlign: TextAlign.center,
+          if (instructions != null && instructions!.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'How to Take:',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.5,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F5F6E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                instructions!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -218,11 +323,7 @@ class _ScheduleRow extends StatelessWidget {
         ),
         const Text(
           ' - ',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
         ),
         Text(
           dose,

@@ -46,6 +46,47 @@ class AdherenceLogsDao extends DatabaseAccessor<AppDatabase>
   Future<AdherenceLog?> getLogById(int id) =>
       (select(adherenceLogs)..where((l) => l.id.equals(id))).getSingleOrNull();
 
+  /// Fetch today's log for a specific patient + medication combination.
+  /// Used by home_screen.dart before marking a dose to decide whether to
+  /// insert a new log or update the existing one.
+  Future<AdherenceLog?> getTodayLogForMedication({
+    required int patientId,
+    required int medicationId,
+  }) {
+    final now = DateTime.now();
+    final dayStart = DateTime(now.year, now.month, now.day);
+    final dayEnd = dayStart.add(const Duration(days: 1));
+    return (select(adherenceLogs)
+          ..where(
+            (l) =>
+                l.patientId.equals(patientId) &
+                l.medicationId.equals(medicationId) &
+                l.scheduledAt.isBiggerOrEqualValue(dayStart) &
+                l.scheduledAt.isSmallerOrEqualValue(dayEnd),
+          )
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  /// Fetch the log for the exact scheduled dose slot.
+  /// Used by AdherenceRepository to check whether a specific reminder time
+  /// slot has already been logged — the unique constraint is
+  /// (patientId, medicationId, scheduledAt).
+  Future<AdherenceLog?> getLogForScheduledDose({
+    required int patientId,
+    required int medicationId,
+    required DateTime scheduledAt,
+  }) =>
+      (select(adherenceLogs)
+        ..where(
+          (l) =>
+              l.patientId.equals(patientId) &
+              l.medicationId.equals(medicationId) &
+              l.scheduledAt.equals(scheduledAt),
+        )
+        ..limit(1))
+          .getSingleOrNull();
+
   /// Fetch the most recent log for a specific medication.
   /// Used by dose_card.dart to show last-taken status.
   Future<AdherenceLog?> getLatestLogForMedication(int medicationId) =>

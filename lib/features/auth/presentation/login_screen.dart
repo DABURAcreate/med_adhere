@@ -36,9 +36,13 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     switch (result) {
-      case AuthSuccess(:final role, :final userId):
+      case AuthSuccess(:final role, :final userId, :final workerClinicName, :final workerFullName):
         if (role == AuthRole.worker) {
-          context.read<SessionProvider>().signInAsWorker(userId);
+          context.read<SessionProvider>().signInAsWorker(
+            userId,
+            clinicName: workerClinicName,
+            fullName: workerFullName,
+          );
           context.go(AppRoutes.dashboard);
         } else {
           context.read<SessionProvider>().signInAsPatient(int.parse(userId));

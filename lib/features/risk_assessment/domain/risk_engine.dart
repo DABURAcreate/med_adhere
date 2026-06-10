@@ -91,7 +91,22 @@ class RiskEngine {
     );
 
     // ── Persist to DB ─────────────────────────────────────────────────────────
-    await _patientsDao.updateRiskLevel(patientId, level.name);
+    // Compute the most-recent log date to store on the patient row.
+    final lastLogAt = logs30.isNotEmpty
+        ? logs30
+            .map((l) => l.scheduledAt)
+            .reduce((a, b) => a.isAfter(b) ? a : b)
+        : null;
+
+    await _patientsDao.updateRiskSummary(
+      patientId,
+      riskLevel: level.name,
+      riskScore: score,
+      adherencePercentage30Days: adherenceRate * 100,
+      takenDoses30Days: taken30,
+      missedDoses30Days: missed30,
+      lastAdherenceLogAt: lastLogAt,
+    );
 
     return RiskResult(
       patientId: patientId,

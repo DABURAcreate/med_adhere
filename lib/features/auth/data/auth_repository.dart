@@ -313,10 +313,23 @@ class AuthRepository {
           .limit(1)
           .get();
       if (workerSnap.docs.isNotEmpty) {
-        final workerId = workerSnap.docs.first.id;
-        debugPrint('[Auth] Worker found in Firestore (id=$workerId).');
-        await AuthService.saveSession(workerId: workerId);
-        return AuthSuccess(role: AuthRole.worker, userId: workerId);
+        final doc = workerSnap.docs.first;
+        final workerId = doc.id;
+        final workerData = doc.data();
+        final clinicName = workerData['clinicName'] as String?;
+        final fullName = workerData['fullName'] as String?;
+        debugPrint('[Auth] Worker found in Firestore (id=$workerId, clinic=$clinicName).');
+        await AuthService.saveSession(
+          workerId: workerId,
+          workerClinicName: clinicName,
+          workerFullName: fullName,
+        );
+        return AuthSuccess(
+          role: AuthRole.worker,
+          userId: workerId,
+          workerClinicName: clinicName,
+          workerFullName: fullName,
+        );
       }
       debugPrint('[Auth] No Firestore worker match.');
 

@@ -1,4 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../providers/session_provider.dart';
+import '../data/adherence_repository.dart';
+import '../data/patient_repository.dart';
 import '../widgets/scaffold.dart';
 
 class AdherenceCalendarScreen extends StatefulWidget {
@@ -10,22 +19,130 @@ class AdherenceCalendarScreen extends StatefulWidget {
 }
 
 class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
-  // The month currently being viewed (day is always set to the 1st).
   late DateTime _visibleMonth;
-
-  // The day the user has tapped (if any) in the visible month.
   int? _selectedDay;
 
-  // Mock adherence data keyed by `YYYY-MM-DD`.
-  // In production this comes from a repository / bloc.
-  late final Map<String, _DayAdherence> _adherence;
+  // Adherence data keyed by 'YYYY-MM-DD', built from real logs.
+  Map<String, _DayAdherence> _adherence = {};
+
+  // Medication id → name, loaded once per session.
+  Map<int, String> _medNames = {};
+
+  int _streak = 0;
+
+  StreamSubscription<List<AdherenceLog>>? _logSub;
+  bool _medsLoaded = false;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _visibleMonth = DateTime(now.year, now.month);
-    _adherence = _buildMockData(_visibleMonth);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_medsLoaded) {
+      _medsLoaded = true;
+      _loadMedNames();
+    }
+    _subscribeToLogs();
+  }
+
+  @override
+  void dispose() {
+    _logSub?.cancel();
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Data loading
+  // ---------------------------------------------------------------------------
+
+  void _subscribeToLogs() {
+    _logSub?.cancel();
+    final patientId = context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) return;
+
+    final from = DateTime(_visibleMonth.year, _visibleMonth.month);
+    final to = DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0, 23, 59, 59);
+
+    _logSub = context
+        .read<AdherenceRepository>()
+        .watchLogsInRange(patientId: patientId, from: from, to: to)
+        .listen(_onLogsUpdated);
+  }
+
+  Future<void> _loadMedNames() async {
+    final patientId = context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) return;
+    final meds = await context.read<PatientRepository>().getMedications(patientId);
+    if (mounted) {
+      setState(() {
+        _medNames = {for (final m in meds) m.id: m.name};
+      });
+    }
+  }
+
+  Future<void> _loadStreak() async {
+    final patientId = context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) return;
+    final s = await context.read<AdherenceRepository>().getCurrentStreak(patientId);
+    if (mounted) setState(() => _streak = s);
+  }
+
+  void _onLogsUpdated(List<AdherenceLog> logs) {
+    final byDay = <String, List<AdherenceLog>>{};
+    for (final log in logs) {
+      final key = _keyFor(log.scheduledAt.year, log.scheduledAt.month, log.scheduledAt.day);
+      byDay.putIfAbsent(key, () => []).add(log);
+    }
+
+    final result = <String, _DayAdherence>{};
+    for (final entry in byDay.entries) {
+      final dayLogs = entry.value;
+      final taken = dayLogs
+          .where((l) => l.status == 'taken' || l.status == 'late')
+          .length;
+      final total = dayLogs.length;
+
+      _DayStatus status;
+      if (total == 0) {
+        status = _DayStatus.none;
+      } else if (taken == total) {
+        status = _DayStatus.taken;
+      } else if (taken > 0) {
+        status = _DayStatus.partial;
+      } else {
+        status = _DayStatus.missed;
+      }
+
+      final meds = dayLogs.map((l) {
+        final scheduledStr = DateFormat('HH:mm').format(l.scheduledAt);
+        final takenStr = l.takenAt != null
+            ? DateFormat('HH:mm').format(l.takenAt!)
+            : null;
+        return _MedDose(
+          name: _medNames[l.medicationId] ?? 'Medication',
+          scheduledAt: scheduledStr,
+          takenAt: takenStr,
+        );
+      }).toList()
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+      result[entry.key] = _DayAdherence(
+        status: status,
+        scheduledCount: total,
+        takenCount: taken,
+        meds: meds,
+      );
+    }
+
+    if (mounted) {
+      setState(() => _adherence = result);
+      _loadStreak();
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -34,22 +151,21 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
 
   void _goToPreviousMonth() {
     setState(() {
-      _visibleMonth =
-          DateTime(_visibleMonth.year, _visibleMonth.month - 1);
+      _visibleMonth = DateTime(_visibleMonth.year, _visibleMonth.month - 1);
       _selectedDay = null;
     });
+    _subscribeToLogs();
   }
 
   void _goToNextMonth() {
     final now = DateTime.now();
-    final nextMonth =
-    DateTime(_visibleMonth.year, _visibleMonth.month + 1);
-    // Don't allow navigating into the future.
+    final nextMonth = DateTime(_visibleMonth.year, _visibleMonth.month + 1);
     if (nextMonth.isAfter(DateTime(now.year, now.month))) return;
     setState(() {
       _visibleMonth = nextMonth;
       _selectedDay = null;
     });
+    _subscribeToLogs();
   }
 
   // ---------------------------------------------------------------------------
@@ -80,23 +196,19 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
                 children: [
                   Row(
                     children: [
-                      _StreakBadge(streakDays: summary.currentStreak),
+                      _StreakBadge(streakDays: _streak),
                       const Spacer(),
 
                       const _LegendItem(
                         color: _AdherenceColors.taken,
                         label: 'Taken',
                       ),
-
                       const SizedBox(width: 12),
-
                       const _LegendItem(
                         color: _AdherenceColors.partial,
                         label: 'Partial',
                       ),
-
                       const SizedBox(width: 12),
-
                       const _LegendItem(
                         color: _AdherenceColors.missed,
                         label: 'Missed',
@@ -110,7 +222,6 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
                     onPrev: _goToPreviousMonth,
                     onNext: _canGoNext() ? _goToNextMonth : null,
                   ),
-
                   const SizedBox(height: 12),
 
                   _CalendarGrid(
@@ -123,7 +234,6 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
                       });
                     },
                   ),
-
                   const SizedBox(height: 20),
 
                   if (_selectedDay != null)
@@ -138,20 +248,15 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
                         _visibleMonth.month,
                         _selectedDay!,
                       )],
-                      onClose: () =>
-                          setState(() => _selectedDay = null),
+                      onClose: () => setState(() => _selectedDay = null),
                     ),
 
-                  if (_selectedDay != null)
-                    const SizedBox(height: 20),
+                  if (_selectedDay != null) const SizedBox(height: 20),
 
                   _MonthlySummary(summary: summary),
-
                   const SizedBox(height: 24),
 
-                  _PreviousMonthButton(
-                    onTap: _goToPreviousMonth,
-                  ),
+                  _PreviousMonthButton(onTap: _goToPreviousMonth),
                 ],
               ),
             ),
@@ -168,14 +273,14 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Summary calculation
+  // Summary calculation (reads from _adherence — now backed by real data)
   // ---------------------------------------------------------------------------
 
   _MonthSummaryData _monthSummary() {
     final today = DateTime.now();
     int taken = 0;
     int scheduled = 0;
-    int streak = 0;
+    int streak = _streak;
 
     final daysInMonth =
         DateTime(_visibleMonth.year, _visibleMonth.month + 1, 0).day;
@@ -188,15 +293,18 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
       scheduled += entry.scheduledCount;
     }
 
-    // Walk backward from today computing the current streak.
+    // Streak from current month data (full streak computed via DB in _loadStreak)
     var cursor = DateTime(today.year, today.month, today.day);
+    int localStreak = 0;
     while (true) {
       final key = _keyFor(cursor.year, cursor.month, cursor.day);
       final entry = _adherence[key];
       if (entry == null || entry.status != _DayStatus.taken) break;
-      streak++;
+      localStreak++;
       cursor = cursor.subtract(const Duration(days: 1));
     }
+    // Use the better of DB streak and local calculation
+    if (localStreak > streak) streak = localStreak;
 
     final pct = scheduled == 0 ? 0.0 : (taken / scheduled) * 100.0;
     return _MonthSummaryData(
@@ -207,64 +315,10 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Mock data
-  // ---------------------------------------------------------------------------
-
-  Map<String, _DayAdherence> _buildMockData(DateTime month) {
-    // Mirrors the design: days 1 & 2 green, 3 green, 4 amber, 5 red, rest grey.
-    // In a real app, this comes from the patient's records repository.
-    return {
-      _keyFor(month.year, month.month, 1): const _DayAdherence(
-        status: _DayStatus.taken,
-        scheduledCount: 2,
-        takenCount: 2,
-        meds: [
-          _MedDose(name: 'Tenofovir / FTC', scheduledAt: '08:00', takenAt: '08:05'),
-          _MedDose(name: 'Dolutegravir', scheduledAt: '20:00', takenAt: '20:12'),
-        ],
-      ),
-      _keyFor(month.year, month.month, 2): const _DayAdherence(
-        status: _DayStatus.taken,
-        scheduledCount: 2,
-        takenCount: 2,
-        meds: [
-          _MedDose(name: 'Tenofovir / FTC', scheduledAt: '08:00', takenAt: '07:58'),
-          _MedDose(name: 'Dolutegravir', scheduledAt: '20:00', takenAt: '20:03'),
-        ],
-      ),
-      _keyFor(month.year, month.month, 3): const _DayAdherence(
-        status: _DayStatus.taken,
-        scheduledCount: 2,
-        takenCount: 2,
-        meds: [
-          _MedDose(name: 'Tenofovir / FTC', scheduledAt: '08:00', takenAt: '08:11'),
-          _MedDose(name: 'Dolutegravir', scheduledAt: '20:00', takenAt: '19:47'),
-        ],
-      ),
-      _keyFor(month.year, month.month, 4): const _DayAdherence(
-        status: _DayStatus.partial,
-        scheduledCount: 2,
-        takenCount: 1,
-        meds: [
-          _MedDose(name: 'Tenofovir / FTC', scheduledAt: '08:00', takenAt: '08:20'),
-          _MedDose(name: 'Dolutegravir', scheduledAt: '20:00', takenAt: null),
-        ],
-      ),
-      _keyFor(month.year, month.month, 5): const _DayAdherence(
-        status: _DayStatus.missed,
-        scheduledCount: 2,
-        takenCount: 0,
-        meds: [
-          _MedDose(name: 'Tenofovir / FTC', scheduledAt: '08:00', takenAt: null),
-          _MedDose(name: 'Dolutegravir', scheduledAt: '20:00', takenAt: null),
-        ],
-      ),
-    };
-  }
-
   static String _keyFor(int y, int m, int d) =>
-      '${y.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
+      '${y.toString().padLeft(4, '0')}-'
+      '${m.toString().padLeft(2, '0')}-'
+      '${d.toString().padLeft(2, '0')}';
 }
 
 // =============================================================================
@@ -272,11 +326,11 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
 // =============================================================================
 
 class _AdherenceColors {
-  static const taken = Color(0xFF22C55E);   // green
-  static const partial = Color(0xFFF59E0B); // amber
-  static const missed = Color(0xFFEF4444);  // red
-  static const none = Color(0xFFD9D9D9);    // grey (no doses scheduled / past)
-  static const future = Color(0xFF1F1F1F);  // future days (invisible on black)
+  static const taken = Color(0xFF22C55E);
+  static const partial = Color(0xFFF59E0B);
+  static const missed = Color(0xFFEF4444);
+  static const none = Color(0xFFD9D9D9);
+  static const future = Color(0xFF1F1F1F);
 }
 
 enum _DayStatus { taken, partial, missed, none, future }
@@ -322,10 +376,7 @@ class _StreakBadge extends StatelessWidget {
 // =============================================================================
 
 class _LegendItem extends StatelessWidget {
-  const _LegendItem({
-    required this.color,
-    required this.label,
-  });
+  const _LegendItem({required this.color, required this.label});
 
   final Color color;
   final String label;
@@ -342,9 +393,7 @@ class _LegendItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(3),
           ),
         ),
-
         const SizedBox(width: 5),
-
         Text(
           label,
           style: const TextStyle(
@@ -431,14 +480,10 @@ class _CalendarGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final firstOfMonth = DateTime(month.year, month.month, 1);
-    final daysInMonth =
-        DateTime(month.year, month.month + 1, 0).day;
-    // Monday-first like the screenshot: 1 = Mon ... 7 = Sun.
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
     final leadingBlanks = firstOfMonth.weekday - 1;
 
     final cells = <Widget>[];
-
-    // Leading blanks.
     for (var i = 0; i < leadingBlanks; i++) {
       cells.add(const SizedBox.shrink());
     }
@@ -446,11 +491,7 @@ class _CalendarGrid extends StatelessWidget {
     final today = DateTime.now();
     for (var d = 1; d <= daysInMonth; d++) {
       final date = DateTime(month.year, month.month, d);
-      final key = _AdherenceCalendarScreenState._keyFor(
-        month.year,
-        month.month,
-        d,
-      );
+      final key = _AdherenceCalendarScreenState._keyFor(month.year, month.month, d);
       final entry = adherence[key];
 
       _DayStatus status;
@@ -528,9 +569,8 @@ class _DayCell extends StatelessWidget {
         decoration: BoxDecoration(
           color: _bg,
           borderRadius: BorderRadius.circular(6),
-          border: selected
-              ? Border.all(color: Colors.white, width: 2)
-              : null,
+          border:
+              selected ? Border.all(color: Colors.white, width: 2) : null,
         ),
         alignment: Alignment.center,
         child: Text(
@@ -590,14 +630,15 @@ class _DayDetailPanel extends StatelessWidget {
               const Spacer(),
               GestureDetector(
                 onTap: onClose,
-                child: const Icon(Icons.close, color: Colors.white54, size: 20),
+                child:
+                    const Icon(Icons.close, color: Colors.white54, size: 20),
               ),
             ],
           ),
           const SizedBox(height: 12),
           if (adherence == null || adherence!.meds.isEmpty)
             const Text(
-              'No doses scheduled.',
+              'No doses logged.',
               style: TextStyle(color: Colors.white70),
             )
           else
@@ -621,9 +662,7 @@ class _MedRow extends StatelessWidget {
         children: [
           Icon(
             taken ? Icons.check_circle : Icons.cancel,
-            color: taken
-                ? _AdherenceColors.taken
-                : _AdherenceColors.missed,
+            color: taken ? _AdherenceColors.taken : _AdherenceColors.missed,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -704,7 +743,7 @@ class _MonthlySummary extends StatelessWidget {
 }
 
 // =============================================================================
-// Previous-month pill button (matches design)
+// Previous-month pill button
 // =============================================================================
 
 class _PreviousMonthButton extends StatelessWidget {
@@ -747,7 +786,7 @@ class _PreviousMonthButton extends StatelessWidget {
 }
 
 // =============================================================================
-// Data models (private to this file — replace with real ones from your domain)
+// Private data models (populated from real logs in _onLogsUpdated)
 // =============================================================================
 
 class _DayAdherence {
@@ -771,7 +810,7 @@ class _MedDose {
   });
   final String name;
   final String scheduledAt;
-  final String? takenAt; // null = missed
+  final String? takenAt;
 }
 
 class _MonthSummaryData {

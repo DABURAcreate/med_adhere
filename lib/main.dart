@@ -14,6 +14,7 @@ import 'features/dashboard/data/dashboard_repository.dart';
 import 'features/patient/data/adherence_repository.dart';
 import 'features/patient/data/patient_repository.dart';
 import 'features/patient_management/data/patient_mgmt_repository.dart';
+import 'features/reports/data/report_repository.dart';
 import 'features/risk_assessment/domain/risk_engine.dart';
 import 'firebase_options.dart';
 import 'providers/locale_provider.dart';
@@ -43,6 +44,7 @@ Future<void> main() async {
   final dashboardRepo = DashboardRepository(db: db);
   final authRepo = AuthRepository(db: db, connectivity: connectivity);
   final patientMgmtRepo = PatientMgmtRepository(db: db);
+  final reportRepo = ReportRepository(db: db);
 
   // Restore previous session if one was saved on disk.
   final session = SessionProvider();
@@ -60,7 +62,11 @@ Future<void> main() async {
     } else if (savedSession.role == 'worker' &&
         savedSession.workerId != null) {
       // Workers are stored in Firestore; trust the session file on startup.
-      session.signInAsWorker(savedSession.workerId!);
+      session.signInAsWorker(
+        savedSession.workerId!,
+        clinicName: savedSession.workerClinicName,
+        fullName: savedSession.workerFullName,
+      );
     }
   }
 
@@ -78,6 +84,7 @@ Future<void> main() async {
         Provider<DashboardRepository>.value(value: dashboardRepo),
         Provider<AuthRepository>.value(value: authRepo),
         Provider<PatientMgmtRepository>.value(value: patientMgmtRepo),
+        Provider<ReportRepository>.value(value: reportRepo),
         ChangeNotifierProvider.value(value: session),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
       ],

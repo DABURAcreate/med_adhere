@@ -46,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   // ─── Schema version ───────────────────────────────────────────────────────
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   // ─── Migrations ───────────────────────────────────────────────────────────
 
@@ -63,6 +63,18 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(patients, patients.isActivated);
         await m.addColumn(patients, patients.activatedAt);
         await m.addColumn(patients, patients.conditions);
+      }
+      // v3: risk summary fields added to patients.
+      if (from < 3) {
+        await m.addColumn(patients, patients.riskScore);
+        await m.addColumn(patients, patients.adherencePercentage30Days);
+        await m.addColumn(patients, patients.takenDoses30Days);
+        await m.addColumn(patients, patients.missedDoses30Days);
+        await m.addColumn(patients, patients.lastAdherenceLogAt);
+      }
+      // v4: clinic name field added to patients for clinic-level filtering.
+      if (from < 4) {
+        await m.addColumn(patients, patients.clinicName);
       }
     },
     beforeOpen: (details) async {

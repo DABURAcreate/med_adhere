@@ -8,7 +8,14 @@ sealed class AuthResult {
 final class AuthSuccess extends AuthResult {
   final AuthRole role;
   final String userId; // int string for patients, Firestore doc ID for workers
-  const AuthSuccess({required this.role, required this.userId});
+  final String? workerClinicName;
+  final String? workerFullName;
+  const AuthSuccess({
+    required this.role,
+    required this.userId,
+    this.workerClinicName,
+    this.workerFullName,
+  });
 }
 
 final class AuthFailure extends AuthResult {

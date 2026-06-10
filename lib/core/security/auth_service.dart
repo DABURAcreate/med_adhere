@@ -28,7 +28,12 @@ class AuthService {
 
   /// Saves the current session to disk so it survives app restarts.
   /// Pass either [patientId] (for patients) or [workerId] (for workers).
-  static Future<void> saveSession({int? patientId, String? workerId}) async {
+  static Future<void> saveSession({
+    int? patientId,
+    String? workerId,
+    String? workerClinicName,
+    String? workerFullName,
+  }) async {
     final file = await _sessionFile();
     final data = <String, dynamic>{};
     if (patientId != null) {
@@ -37,13 +42,22 @@ class AuthService {
     } else if (workerId != null) {
       data['workerId'] = workerId;
       data['role'] = 'worker';
+      if (workerClinicName != null) data['workerClinicName'] = workerClinicName;
+      if (workerFullName != null) data['workerFullName'] = workerFullName;
     }
     file.writeAsStringSync(jsonEncode(data));
   }
 
   /// Returns the stored session, or null if no valid session exists.
   /// Handles the legacy format (patient-only, no role field).
-  static Future<({String role, int? patientId, String? workerId})?> loadSession() async {
+  static Future<
+      ({
+        String role,
+        int? patientId,
+        String? workerId,
+        String? workerClinicName,
+        String? workerFullName,
+      })?> loadSession() async {
     try {
       final file = await _sessionFile();
       if (!file.existsSync()) return null;
@@ -52,12 +66,26 @@ class AuthService {
       final role = data['role'] as String? ?? 'patient';
       final patientId = data['patientId'] as int?;
       final workerId = data['workerId'] as String?;
+      final workerClinicName = data['workerClinicName'] as String?;
+      final workerFullName = data['workerFullName'] as String?;
 
       if (role == 'patient' && patientId != null) {
-        return (role: 'patient', patientId: patientId, workerId: null);
+        return (
+          role: 'patient',
+          patientId: patientId,
+          workerId: null,
+          workerClinicName: null,
+          workerFullName: null,
+        );
       }
       if (role == 'worker' && workerId != null) {
-        return (role: 'worker', patientId: null, workerId: workerId);
+        return (
+          role: 'worker',
+          patientId: null,
+          workerId: workerId,
+          workerClinicName: workerClinicName,
+          workerFullName: workerFullName,
+        );
       }
       return null;
     } catch (_) {

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../data/patient_mgmt_repository.dart';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
@@ -14,6 +17,7 @@ const kSuccess = Color(0xFF16A34A);
 const kWarning = Color(0xFFD97706);
 
 // ── Model ─────────────────────────────────────────────────────────────────────
+// id is either a numeric string (existing DB record) or "new_<timestamp>" (new)
 class _MedEntry {
   String id;
   String name;
@@ -33,23 +37,7 @@ class _MedEntry {
     this.isExpanded = false,
   });
 
-  _MedEntry copyWith({
-    String? name,
-    String? dosage,
-    int? timesPerDay,
-    List<TimeOfDay>? times,
-    bool? active,
-    bool? isExpanded,
-  }) =>
-      _MedEntry(
-        id: id,
-        name: name ?? this.name,
-        dosage: dosage ?? this.dosage,
-        timesPerDay: timesPerDay ?? this.timesPerDay,
-        times: times ?? List.from(this.times),
-        active: active ?? this.active,
-        isExpanded: isExpanded ?? this.isExpanded,
-      );
+  int? get dbId => int.tryParse(id);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -66,36 +54,13 @@ List<TimeOfDay> _defaultTimes(int n) {
   return List.generate(n, (i) => all[i % all.length]);
 }
 
-// ── Fake data ─────────────────────────────────────────────────────────────────
-List<_MedEntry> _fakeMeds(String patientId) => [
-  _MedEntry(
-    id: 'med1',
-    name: 'Tenofovir / Lamivudine / Dolutegravir',
-    dosage: '300/300/50 mg',
-    timesPerDay: 1,
-    times: [const TimeOfDay(hour: 8, minute: 0)],
-    active: true,
-  ),
-  _MedEntry(
-    id: 'med2',
-    name: 'Amlodipine',
-    dosage: '5 mg',
-    timesPerDay: 2,
-    times: [
-      const TimeOfDay(hour: 8, minute: 0),
-      const TimeOfDay(hour: 20, minute: 0),
-    ],
-    active: true,
-  ),
-  _MedEntry(
-    id: 'med3',
-    name: 'Cotrimoxazole',
-    dosage: '960 mg',
-    timesPerDay: 1,
-    times: [const TimeOfDay(hour: 8, minute: 0)],
-    active: false,
-  ),
-];
+TimeOfDay _parseTime(String hhmm) {
+  final parts = hhmm.split(':');
+  return TimeOfDay(
+    hour: int.tryParse(parts[0]) ?? 8,
+    minute: parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0,
+  );
+}
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 class MedicationScheduleScreen extends StatefulWidget {
@@ -108,36 +73,102 @@ class MedicationScheduleScreen extends StatefulWidget {
       _MedicationScheduleScreenState();
 }
 
-class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
+class _MedicationScheduleScreenState
+    extends State<MedicationScheduleScreen> {
   late List<_MedEntry> _meds;
   bool _hasChanges = false;
-  // Track controllers per med id
+  bool _loading = true;
+
+  String _patientName = '—';
+  String _clinicCode = '—';
+  String _patientInitials = '?';
+
+  // DB ids present when the screen loaded — used to detect removals.
+  final Set<int> _originalDbIds = {};
+
   final Map<String, TextEditingController> _nameCtrl = {};
   final Map<String, TextEditingController> _doseCtrl = {};
-
-  // Fake patient info
-  static const _patientName = 'Sipho Dlamini';
-  static const _clinicCode = 'MBM-0041';
 
   @override
   void initState() {
     super.initState();
-    _meds = _fakeMeds(widget.patientId);
-    for (final m in _meds) {
-      _nameCtrl[m.id] = TextEditingController(text: m.name);
-      _doseCtrl[m.id] = TextEditingController(text: m.dosage);
-    }
+    _meds = [];
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSchedule());
   }
 
   @override
   void dispose() {
-    for (final c in _nameCtrl.values) {
-      c.dispose();
-    }
-    for (final c in _doseCtrl.values) {
-      c.dispose();
-    }
+    for (final c in _nameCtrl.values) c.dispose();
+    for (final c in _doseCtrl.values) c.dispose();
     super.dispose();
+  }
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+  Future<void> _loadSchedule() async {
+    final patientIdInt = int.tryParse(widget.patientId);
+    if (patientIdInt == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    final mgmtRepo = context.read<PatientMgmtRepository>();
+
+    final patient = await mgmtRepo.getPatientById(patientIdInt);
+    final meds = await mgmtRepo.getMedicationsForPatient(patientIdInt);
+    final reminders = await mgmtRepo.getRemindersForPatient(patientIdInt);
+
+    // Group reminders by medicationId
+    final remindersByMed = <int, List<String>>{};
+    for (final r in reminders) {
+      if (r.isActive) {
+        remindersByMed.putIfAbsent(r.medicationId, () => []).add(r.scheduledTime);
+      }
+    }
+
+    final entries = <_MedEntry>[];
+    for (final med in meds) {
+      _originalDbIds.add(med.id);
+      final times = remindersByMed[med.id] ?? [];
+      final timeOfDays = times.map(_parseTime).toList();
+      if (timeOfDays.isEmpty) timeOfDays.add(const TimeOfDay(hour: 8, minute: 0));
+
+      final entry = _MedEntry(
+        id: med.id.toString(),
+        name: med.name,
+        dosage: med.dosage,
+        timesPerDay: timeOfDays.length,
+        times: timeOfDays,
+        active: med.isActive,
+      );
+      entries.add(entry);
+    }
+
+    // Set up text controllers
+    final Map<String, TextEditingController> nameCtrl = {};
+    final Map<String, TextEditingController> doseCtrl = {};
+    for (final e in entries) {
+      nameCtrl[e.id] = TextEditingController(text: e.name);
+      doseCtrl[e.id] = TextEditingController(text: e.dosage);
+    }
+
+    if (!mounted) return;
+
+    final name = patient?.fullName ?? '—';
+    setState(() {
+      _patientName = name;
+      _clinicCode = patient?.registrationCode ?? '—';
+      _patientInitials = name
+          .trim()
+          .split(' ')
+          .where((w) => w.isNotEmpty)
+          .take(2)
+          .map((w) => w[0].toUpperCase())
+          .join();
+      _meds = entries;
+      _nameCtrl.addAll(nameCtrl);
+      _doseCtrl.addAll(doseCtrl);
+      _loading = false;
+    });
   }
 
   void _markChanged() => setState(() => _hasChanges = true);
@@ -169,7 +200,6 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Handle
                   Center(
                     child: Container(
                       width: 36,
@@ -190,22 +220,19 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                           color: kP4.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.add_rounded,
-                            color: kP4, size: 20),
+                        child: const Icon(Icons.add_rounded, color: kP4, size: 20),
                       ),
                       const SizedBox(width: 10),
                       const Text(
                         'Add Medication',
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: kP2,
-                        ),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: kP2),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   _sheetFieldLabel('Medication Name *'),
                   const SizedBox(height: 6),
                   TextFormField(
@@ -215,12 +242,10 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                     decoration: _inputDec(
                         hint: 'e.g. Isoniazid',
                         icon: Icons.medication_liquid_rounded),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Required'
-                        : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-
                   _sheetFieldLabel('Dosage *'),
                   const SizedBox(height: 6),
                   TextFormField(
@@ -228,12 +253,10 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                     style: const TextStyle(fontSize: 14),
                     decoration: _inputDec(
                         hint: 'e.g. 300 mg', icon: Icons.scale_rounded),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Required'
-                        : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 14),
-
                   _sheetFieldLabel('Times per day'),
                   const SizedBox(height: 8),
                   Row(
@@ -250,9 +273,7 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                               color: sel ? kP3 : Colors.grey.shade100,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                  color: sel
-                                      ? kP3
-                                      : Colors.grey.shade300),
+                                  color: sel ? kP3 : Colors.grey.shade300),
                             ),
                             child: Text(
                               '${n}×',
@@ -260,9 +281,7 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
-                                color: sel
-                                    ? Colors.white
-                                    : Colors.grey.shade600,
+                                color: sel ? Colors.white : Colors.grey.shade600,
                               ),
                             ),
                           ),
@@ -271,11 +290,10 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 24),
-
                   ElevatedButton.icon(
                     onPressed: () {
                       if (!(formKey.currentState?.validate() ?? false)) return;
-                      final id = 'med_${DateTime.now().millisecondsSinceEpoch}';
+                      final id = 'new_${DateTime.now().millisecondsSinceEpoch}';
                       final entry = _MedEntry(
                         id: id,
                         name: nameCtrl.text.trim(),
@@ -287,10 +305,8 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                       );
                       setState(() {
                         _meds.add(entry);
-                        _nameCtrl[id] =
-                            TextEditingController(text: entry.name);
-                        _doseCtrl[id] =
-                            TextEditingController(text: entry.dosage);
+                        _nameCtrl[id] = TextEditingController(text: entry.name);
+                        _doseCtrl[id] = TextEditingController(text: entry.dosage);
                         _hasChanges = true;
                       });
                       Navigator.pop(context);
@@ -322,25 +338,24 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Remove Medication?',
-          style: TextStyle(
-              fontSize: 16, fontWeight: FontWeight.w900, color: kP2),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Remove Medication?',
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
         content: RichText(
           text: TextSpan(
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.5),
+            style: TextStyle(
+                fontSize: 13, color: Colors.grey.shade700, height: 1.5),
             children: [
               const TextSpan(text: 'Remove '),
               TextSpan(
                 text: med.name,
-                style: const TextStyle(fontWeight: FontWeight.w700, color: kP2),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, color: kP2),
               ),
               const TextSpan(
                   text:
-                  ' from this patient\'s schedule? Past logs will not be affected.'),
+                      ' from this patient\'s schedule? Past logs will not be affected.'),
             ],
           ),
         ),
@@ -380,15 +395,14 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Save Changes?',
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
         content: Text(
           'Changes will apply to future doses only. Past medication logs will not be affected.',
-          style:
-          TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.5),
+          style: TextStyle(
+              fontSize: 13, color: Colors.grey.shade700, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -397,17 +411,9 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                 style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              setState(() => _hasChanges = false);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Schedule saved successfully'),
-                backgroundColor: kSuccess,
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ));
-              context.pop();
+              await _persistSchedule();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kP4,
@@ -424,9 +430,68 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
     );
   }
 
+  Future<void> _persistSchedule() async {
+    final patientIdInt = int.tryParse(widget.patientId);
+    if (patientIdInt == null) return;
+
+    final currentDbIds =
+        _meds.map((m) => m.dbId).whereType<int>().toSet();
+    final removedIds =
+        _originalDbIds.difference(currentDbIds).toList();
+
+    final entries = _meds.map((m) {
+      return MedScheduleEntry(
+        existingId: m.dbId,
+        name: m.name,
+        dosage: m.dosage,
+        times: m.times.map(_fmt).toList(),
+        active: m.active,
+      );
+    }).toList();
+
+    try {
+      await context.read<PatientMgmtRepository>().saveMedicationSchedule(
+        patientId: patientIdInt,
+        entries: entries,
+        removedIds: removedIds,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _hasChanges = false;
+        // Refresh original ids after save
+        _originalDbIds.clear();
+        _originalDbIds.addAll(currentDbIds);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Schedule saved successfully'),
+        backgroundColor: kSuccess,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Save failed: $e'),
+        backgroundColor: kDanger,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: kBg,
+        appBar: _buildAppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: _buildAppBar(),
@@ -438,13 +503,13 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
             child: _meds.isEmpty
                 ? _buildEmpty()
                 : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              children: [
-                ..._meds.map((m) => _buildMedTile(m)),
-                const SizedBox(height: 8),
-                _buildAddButton(),
-              ],
-            ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                    children: [
+                      ..._meds.map((m) => _buildMedTile(m)),
+                      const SizedBox(height: 8),
+                      _buildAddButton(),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -454,48 +519,47 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
 
   // ── App bar ───────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() => AppBar(
-    backgroundColor: kP2,
-    foregroundColor: Colors.white,
-    elevation: 0,
-    leading: IconButton(
-      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-      onPressed: () {
-        if (_hasChanges) {
-          _showUnsavedDialog();
-        } else {
-          context.pop();
-        }
-      },
-    ),
-    title: const Text(
-      'Medication Schedule',
-      style: TextStyle(
-          fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
-    ),
-    flexibleSpace: Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-            colors: [kP2, kP3],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
-      ),
-    ),
-    bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(4),
-      child: Container(
-        height: 4,
-        decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [kP4, kP5])),
-      ),
-    ),
-  );
+        backgroundColor: kP2,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+          onPressed: () {
+            if (_hasChanges) {
+              _showUnsavedDialog();
+            } else {
+              context.pop();
+            }
+          },
+        ),
+        title: const Text(
+          'Medication Schedule',
+          style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+                colors: [kP2, kP3],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight),
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: Container(
+            height: 4,
+            decoration:
+                const BoxDecoration(gradient: LinearGradient(colors: [kP4, kP5])),
+          ),
+        ),
+      );
 
   void _showUnsavedDialog() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Unsaved Changes',
             style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
@@ -506,17 +570,15 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Keep Editing',
-                style: TextStyle(
-                    color: kP3, fontWeight: FontWeight.w700)),
+                style: TextStyle(color: kP3, fontWeight: FontWeight.w700)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               context.pop();
             },
-            child: Text('Discard',
-                style: TextStyle(
-                    color: Colors.grey.shade500)),
+            child:
+                Text('Discard', style: TextStyle(color: Colors.grey.shade500)),
           ),
         ],
       ),
@@ -525,101 +587,98 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
 
   // ── Patient header ────────────────────────────────────────────────────────
   Widget _buildPatientHeader() => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-    child: Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(_patientInitials,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: kP2)),
+              ),
             ),
-            shape: BoxShape.circle,
-          ),
-          child: const Center(
-            child: Text('SD',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: kP2)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                _patientName,
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A2E)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _patientName,
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1A1A2E)),
+                  ),
+                  Text(
+                    _clinicCode,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ],
               ),
-              Text(
-                _clinicCode,
-                style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: kP4.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kP4.withOpacity(0.2)),
               ),
-            ],
-          ),
-        ),
-        Container(
-          padding:
-          const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: kP4.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: kP4.withOpacity(0.2)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.medication_rounded, size: 13, color: kP4),
-              const SizedBox(width: 5),
-              Text(
-                '${_meds.length} meds',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: kP4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.medication_rounded, size: 13, color: kP4),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${_meds.length} meds',
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700, color: kP4),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 
   // ── Change banner ─────────────────────────────────────────────────────────
   Widget _buildChangeBanner() => Container(
-    width: double.infinity,
-    color: kWarning.withOpacity(0.08),
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-    child: Row(
-      children: [
-        Icon(Icons.info_outline_rounded, size: 14, color: kWarning),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            'Changes apply to future doses only and will not affect logged history.',
-            style: TextStyle(
-              fontSize: 11,
-              color: kWarning.withOpacity(0.9),
-              fontWeight: FontWeight.w600,
-              height: 1.4,
+        width: double.infinity,
+        color: kWarning.withOpacity(0.08),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded, size: 14, color: kWarning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Changes apply to future doses only and will not affect logged history.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: kWarning.withOpacity(0.9),
+                  fontWeight: FontWeight.w600,
+                  height: 1.4,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 
   // ── Med tile (swipe-to-remove + expandable) ───────────────────────────────
   Widget _buildMedTile(_MedEntry med) {
@@ -662,9 +721,7 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
           color: kCard,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: med.active
-                ? Colors.transparent
-                : Colors.grey.shade300,
+            color: med.active ? Colors.transparent : Colors.grey.shade300,
           ),
           boxShadow: [
             BoxShadow(
@@ -678,15 +735,13 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
           borderRadius: BorderRadius.circular(16),
           child: Column(
             children: [
-              // ── Tile header ──
               GestureDetector(
-                onTap: () => setState(
-                        () => med.isExpanded = !med.isExpanded),
+                onTap: () =>
+                    setState(() => med.isExpanded = !med.isExpanded),
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                   child: Row(
                     children: [
-                      // Active indicator dot
                       Container(
                         width: 10,
                         height: 10,
@@ -697,16 +752,15 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                               : Colors.grey.shade400,
                           boxShadow: med.active
                               ? [
-                            BoxShadow(
-                              color: kSuccess.withOpacity(0.4),
-                              blurRadius: 4,
-                            )
-                          ]
+                                  BoxShadow(
+                                    color: kSuccess.withOpacity(0.4),
+                                    blurRadius: 4,
+                                  )
+                                ]
                               : null,
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Icon
                       Container(
                         width: 36,
                         height: 36,
@@ -722,7 +776,6 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                             size: 20),
                       ),
                       const SizedBox(width: 10),
-                      // Name + dosage
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -742,20 +795,17 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                             const SizedBox(height: 2),
                             Row(
                               children: [
-                                Text(
-                                  med.dosage,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey.shade500),
-                                ),
+                                Text(med.dosage,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade500)),
                                 const SizedBox(width: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: kP3.withOpacity(0.07),
-                                    borderRadius:
-                                    BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     '${med.timesPerDay}× daily',
@@ -771,29 +821,24 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                           ],
                         ),
                       ),
-                      // Times preview (collapsed only)
                       if (!med.isExpanded) ...[
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: med.times
                               .take(2)
-                              .map((t) => Text(
-                            _fmt(t),
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade500,
-                            ),
-                          ))
+                              .map((t) => Text(_fmt(t),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade500,
+                                  )))
                               .toList(),
                         ),
                         if (med.times.length > 2)
-                          Text(
-                            '+${med.times.length - 2}',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade400),
-                          ),
+                          Text('+${med.times.length - 2}',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey.shade400)),
                         const SizedBox(width: 4),
                       ],
                       Icon(
@@ -807,8 +852,6 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
                   ),
                 ),
               ),
-
-              // ── Expanded content ──
               AnimatedCrossFade(
                 firstChild: const SizedBox(width: double.infinity),
                 secondChild: _buildExpandedContent(med),
@@ -825,373 +868,351 @@ class _MedicationScheduleScreenState extends State<MedicationScheduleScreen> {
   }
 
   Widget _buildExpandedContent(_MedEntry med) => Container(
-    padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
-        const SizedBox(height: 14),
-
-        // Dose field
-        _exLabel('Dosage'),
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: _doseCtrl[med.id],
-          style: const TextStyle(fontSize: 13),
-          onChanged: (_) => _markChanged(),
-          decoration: _inputDec(
-              hint: 'e.g. 300 mg', icon: Icons.scale_rounded),
-        ),
-        const SizedBox(height: 14),
-
-        // Frequency
-        _exLabel('Times per day'),
-        const SizedBox(height: 8),
-        Row(
-          children: [1, 2, 3, 4].map((n) {
-            final sel = med.timesPerDay == n;
-            return Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() {
-                  med.timesPerDay = n;
-                  // Preserve existing times, pad or trim
-                  final existing = List<TimeOfDay>.from(med.times);
-                  if (n > existing.length) {
-                    final defaults = _defaultTimes(n);
-                    for (int i = existing.length; i < n; i++) {
-                      existing.add(defaults[i]);
-                    }
-                  } else {
-                    existing.removeRange(n, existing.length);
-                  }
-                  med.times = existing;
-                  _markChanged();
-                }),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: EdgeInsets.only(right: n < 4 ? 8 : 0),
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: sel ? kP3 : Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: sel ? kP3 : Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    '${n}×',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: sel ? Colors.white : Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 14),
-
-        // Time pickers
-        _exLabel('Reminder times'),
-        const SizedBox(height: 10),
-        ...med.times.asMap().entries.map((e) {
-          final i = e.key;
-          final t = e.value;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: kP2.withOpacity(0.07),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${i + 1}',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          color: kP2),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'Dose ${i + 1}',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600),
-                ),
-                const Spacer(),
-                GestureDetector(
-                  onTap: () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: t,
-                      builder: (ctx, child) => Theme(
-                        data: Theme.of(ctx).copyWith(
-                          colorScheme: ColorScheme.light(
-                            primary: kP3,
-                            onPrimary: Colors.white,
-                            surface: kCard,
-                          ),
-                        ),
-                        child: child!,
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
+            const SizedBox(height: 14),
+            _exLabel('Dosage'),
+            const SizedBox(height: 6),
+            TextFormField(
+              controller: _doseCtrl[med.id],
+              style: const TextStyle(fontSize: 13),
+              onChanged: (_) => _markChanged(),
+              decoration: _inputDec(
+                  hint: 'e.g. 300 mg', icon: Icons.scale_rounded),
+            ),
+            const SizedBox(height: 14),
+            _exLabel('Times per day'),
+            const SizedBox(height: 8),
+            Row(
+              children: [1, 2, 3, 4].map((n) {
+                final sel = med.timesPerDay == n;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() {
+                      med.timesPerDay = n;
+                      final existing = List<TimeOfDay>.from(med.times);
+                      if (n > existing.length) {
+                        final defaults = _defaultTimes(n);
+                        for (int i = existing.length; i < n; i++) {
+                          existing.add(defaults[i]);
+                        }
+                      } else {
+                        existing.removeRange(n, existing.length);
+                      }
+                      med.times = existing;
+                      _markChanged();
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      margin: EdgeInsets.only(right: n < 4 ? 8 : 0),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: sel ? kP3 : Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: sel ? kP3 : Colors.grey.shade300),
                       ),
-                    );
-                    if (picked != null) {
-                      setState(() {
-                        med.times[i] = picked;
-                        _markChanged();
-                      });
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: kP3.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: kP3.withOpacity(0.25)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.access_time_rounded,
-                            size: 14, color: kP3),
-                        const SizedBox(width: 6),
-                        Text(
-                          _fmt(t),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: kP2,
-                          ),
+                      child: Text(
+                        '${n}×',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: sel ? Colors.white : Colors.grey.shade600,
                         ),
-                        const SizedBox(width: 6),
-                        Icon(Icons.edit_rounded,
-                            size: 11, color: kP4),
-                      ],
+                      ),
                     ),
                   ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 14),
+            _exLabel('Reminder times'),
+            const SizedBox(height: 10),
+            ...med.times.asMap().entries.map((e) {
+              final i = e.key;
+              final t = e.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: kP2.withOpacity(0.07),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text('${i + 1}',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: kP2)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text('Dose ${i + 1}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade600)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime: t,
+                          builder: (ctx, child) => Theme(
+                            data: Theme.of(ctx).copyWith(
+                              colorScheme: ColorScheme.light(
+                                primary: kP3,
+                                onPrimary: Colors.white,
+                                surface: kCard,
+                              ),
+                            ),
+                            child: child!,
+                          ),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            med.times[i] = picked;
+                            _markChanged();
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: kP3.withOpacity(0.07),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: kP3.withOpacity(0.25)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.access_time_rounded,
+                                size: 14, color: kP3),
+                            const SizedBox(width: 6),
+                            Text(_fmt(t),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: kP2,
+                                )),
+                            const SizedBox(width: 6),
+                            Icon(Icons.edit_rounded, size: 11, color: kP4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 14),
+            Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  med.active
+                      ? Icons.check_circle_rounded
+                      : Icons.cancel_rounded,
+                  size: 18,
+                  color:
+                      med.active ? kSuccess : Colors.grey.shade400,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        med.active ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: med.active ? kSuccess : Colors.grey.shade500,
+                        ),
+                      ),
+                      Text(
+                        med.active
+                            ? 'Patient receives reminders for this medication'
+                            : 'No reminders sent — medication paused',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade400,
+                            height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: med.active,
+                  activeColor: kSuccess,
+                  inactiveThumbColor: Colors.grey.shade400,
+                  inactiveTrackColor: Colors.grey.shade200,
+                  onChanged: (v) => setState(() {
+                    med.active = v;
+                    _markChanged();
+                  }),
                 ),
               ],
             ),
-          );
-        }),
-
-        const SizedBox(height: 14),
-        Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
-        const SizedBox(height: 12),
-
-        // Active toggle
-        Row(
-          children: [
-            Icon(
-              med.active
-                  ? Icons.check_circle_rounded
-                  : Icons.cancel_rounded,
-              size: 18,
-              color: med.active ? kSuccess : Colors.grey.shade400,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    med.active ? 'Active' : 'Inactive',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: med.active
-                          ? kSuccess
-                          : Colors.grey.shade500,
-                    ),
-                  ),
-                  Text(
-                    med.active
-                        ? 'Patient receives reminders for this medication'
-                        : 'No reminders sent — medication paused',
-                    style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade400,
-                        height: 1.3),
-                  ),
-                ],
-              ),
-            ),
-            Switch(
-              value: med.active,
-              activeColor: kSuccess,
-              inactiveThumbColor: Colors.grey.shade400,
-              inactiveTrackColor: Colors.grey.shade200,
-              onChanged: (v) => setState(() {
-                med.active = v;
-                _markChanged();
-              }),
-            ),
           ],
         ),
-      ],
-    ),
-  );
+      );
 
   // ── Add button ────────────────────────────────────────────────────────────
   Widget _buildAddButton() => GestureDetector(
-    onTap: _showAddSheet,
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: kP4.withOpacity(0.45),
-            width: 1.5,
-            style: BorderStyle.solid),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.add_circle_rounded, color: kP4, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            '+ Add Medication',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: kP4,
-            ),
+        onTap: _showAddSheet,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: kP4.withOpacity(0.45),
+                width: 1.5,
+                style: BorderStyle.solid),
           ),
-        ],
-      ),
-    ),
-  );
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_circle_rounded, color: kP4, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '+ Add Medication',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kP4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
 
   // ── Empty state ───────────────────────────────────────────────────────────
   Widget _buildEmpty() => Center(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: kP1.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child:
-            Icon(Icons.medication_rounded, size: 36, color: kP4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: kP1.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.medication_rounded, size: 36, color: kP4),
+              ),
+              const SizedBox(height: 16),
+              const Text('No medications yet',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: kP2)),
+              const SizedBox(height: 6),
+              Text(
+                'Tap below to add the first medication for this patient.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    height: 1.5),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _showAddSheet,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add Medication'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kP3,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Text('No medications yet',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kP2)),
-          const SizedBox(height: 6),
-          Text(
-            'Tap below to add the first medication for this patient.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade500,
-                height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _showAddSheet,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add Medication'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kP3,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 13),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              textStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 
   // ── Save bar ──────────────────────────────────────────────────────────────
   Widget _buildSaveBar() => Container(
-    padding: EdgeInsets.fromLTRB(
-        16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.07),
-          blurRadius: 10,
-          offset: const Offset(0, -3),
+        padding: EdgeInsets.fromLTRB(
+            16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
-      ],
-    ),
-    child: ElevatedButton.icon(
-      onPressed: _hasChanges ? _save : null,
-      icon: const Icon(Icons.save_rounded, size: 18),
-      label: Text(_hasChanges ? 'Save Changes' : 'No Changes'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _hasChanges ? kP4 : Colors.grey.shade300,
-        foregroundColor:
-        _hasChanges ? Colors.white : Colors.grey.shade500,
-        minimumSize: const Size(double.infinity, 50),
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(
-            fontSize: 14, fontWeight: FontWeight.w700),
-        elevation: 0,
-      ),
-    ),
-  );
+        child: ElevatedButton.icon(
+          onPressed: _hasChanges ? _save : null,
+          icon: const Icon(Icons.save_rounded, size: 18),
+          label: Text(_hasChanges ? 'Save Changes' : 'No Changes'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor:
+                _hasChanges ? kP4 : Colors.grey.shade300,
+            foregroundColor: _hasChanges ? Colors.white : Colors.grey.shade500,
+            minimumSize: const Size(double.infinity, 50),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w700),
+            elevation: 0,
+          ),
+        ),
+      );
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   Widget _exLabel(String label) => Text(
-    label,
-    style: TextStyle(
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
-      color: Colors.grey.shade500,
-      letterSpacing: 0.2,
-    ),
-  );
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.shade500,
+          letterSpacing: 0.2,
+        ),
+      );
 
   Widget _sheetFieldLabel(String label) => Text(
-    label,
-    style: TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-      color: Colors.grey.shade600,
-    ),
-  );
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.shade600,
+        ),
+      );
 
-  InputDecoration _inputDec(
-      {required String hint, required IconData icon}) =>
+  InputDecoration _inputDec({required String hint, required IconData icon}) =>
       InputDecoration(
         hintText: hint,
-        hintStyle:
-        TextStyle(color: Colors.grey.shade400, fontSize: 13),
+        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
         prefixIcon: Icon(icon, color: kP4, size: 18),
         filled: true,
         fillColor: kBg,
         contentPadding:
-        const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+            const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,

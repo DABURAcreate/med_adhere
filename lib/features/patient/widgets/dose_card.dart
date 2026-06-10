@@ -1,185 +1,213 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-class DoseCard extends StatefulWidget {
+import '../domain/today_dose_item.dart';
+
+class DoseCard extends StatelessWidget {
   final String medicationName;
-  final String imageName;
+
+  /// Scheduled dose time as HH:mm, e.g. "08:00". Shown when pending.
+  final String doseTime;
+
+  final DoseStatus status;
+  final DateTime? loggedAt;
+  final VoidCallback? onTaken;
+  final VoidCallback? onMissed;
 
   const DoseCard({
     super.key,
     required this.medicationName,
-    required this.imageName,
+    required this.doseTime,
+    required this.status,
+    this.loggedAt,
+    this.onTaken,
+    this.onMissed,
   });
 
   @override
-  State<DoseCard> createState() => _DoseCardState();
-}
-
-class _DoseCardState extends State<DoseCard> {
-  late DateTime _currentTime;
-
-  @override
-  void initState() {
-    super.initState();
-    _updateTime();
-  }
-
-  void _updateTime() {
-    _currentTime = DateTime.now();
-  }
-
-  String _formatTime(DateTime time) {
-    return DateFormat('hh:mm a').format(time);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        color: const Color(0xFF1A8FA3),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Medication Name
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: 164,
-                  height: 58,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      widget.medicationName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: const Color(0xFF1A8FA3),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Top row: name + status chip ─────────────────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    medicationName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                _StatusChip(status: status),
+              ],
+            ),
 
-              const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-              // Dose Time
-              Row(
-                children: [
-                  const Text(
-                    'Dose Time: ',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
+            // ── Dose time row ────────────────────────────────────────────────
+            Row(
+              children: [
+                Text(
+                  status == DoseStatus.pending ? 'Scheduled: ' : 'Logged at: ',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
                   ),
-                  Text(
-                    _formatTime(_currentTime),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFFAEFF00),
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+                Text(
+                  _timeLabel(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFFAEFF00),
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
 
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-              // Image + Buttons
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Image
-                  Image.asset(
-                    'assets/images/MEDICINE.png',
-                    height: 137,
-                    width: 119,
-                    fit: BoxFit.contain,
+            // ── Image + buttons ───────────────────────────────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Image.asset(
+                  'assets/images/MEDICINE.png',
+                  height: 110,
+                  width: 95,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _ActionButton(
+                        label: 'TAKEN',
+                        icon: Icons.check_circle_rounded,
+                        activeColor: const Color(0xFF4CAF50),
+                        isActive: status == DoseStatus.taken,
+                        onPressed: status == DoseStatus.taken ? null : onTaken,
+                      ),
+                      _ActionButton(
+                        label: 'MISSED',
+                        icon: Icons.cancel_rounded,
+                        activeColor: const Color(0xFFFF0000),
+                        isActive: status == DoseStatus.missed,
+                        onPressed:
+                            status == DoseStatus.missed ? null : onMissed,
+                      ),
+                    ],
                   ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                  const SizedBox(width: 16),
+  String _timeLabel() {
+    if (status == DoseStatus.pending) {
+      return doseTime != '--:--' ? doseTime : '—';
+    }
+    if (loggedAt != null) return DateFormat('hh:mm a').format(loggedAt!);
+    return doseTime != '--:--' ? doseTime : '—';
+  }
+}
 
-                  // Buttons (FIXED OVERFLOW)
-                  Expanded(
-                    child: Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 8,
-                      children: [
-                        SizedBox(
-                          height: 35,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${widget.medicationName} marked as TAKEN',
-                                  ),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                            ),
-                            child: const Text(
-                              'TAKEN',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
+// ── Status chip ──────────────────────────────────────────────────────────────
 
-                        SizedBox(
-                          height: 35,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    '${widget.medicationName} marked as MISSED',
-                                  ),
-                                ),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFF0000),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(50),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                            ),
-                            child: const Text(
-                              'MISSED',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+class _StatusChip extends StatelessWidget {
+  final DoseStatus status;
+
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, bg) = switch (status) {
+      DoseStatus.taken => ('Taken', const Color(0xFF4CAF50)),
+      DoseStatus.missed => ('Missed', const Color(0xFFFF0000)),
+      DoseStatus.pending => ('Pending', const Color(0xFFFFC107)),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Action button ─────────────────────────────────────────────────────────────
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color activeColor;
+  final bool isActive;
+  final VoidCallback? onPressed;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.activeColor,
+    required this.isActive,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 14),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isActive ? activeColor : activeColor.withAlpha(160),
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: activeColor,
+          disabledForegroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(50),
+            side: isActive
+                ? BorderSide(color: Colors.white.withAlpha(180), width: 1.5)
+                : BorderSide.none,
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+          ),
+          elevation: isActive ? 0 : 2,
         ),
       ),
     );

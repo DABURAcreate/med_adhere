@@ -84,4 +84,15 @@ class PatientRepository {
       }
     });
   }
+
+  // ── Reminder queries ───────────────────────────────────────────────────────
+
+  Future<List<Reminder>> getRemindersForPatient(int patientId) =>
+      _db.remindersDao.getRemindersForPatient(patientId);
+
+  Stream<List<Reminder>> watchRemindersForPatient(int patientId) =>
+      _db.remindersDao.watchRemindersForPatient(patientId);
+
+  Future<List<Reminder>> getActiveRemindersForMedication(int medicationId) =>
+      _db.remindersDao.getActiveRemindersForMedication(medicationId);
 }

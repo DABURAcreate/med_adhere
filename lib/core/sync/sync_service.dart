@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../database/app_database.dart';
@@ -93,12 +94,21 @@ class SyncService {
           'gender': p.gender,
           'language': p.language,
           'caregiverPhone': p.caregiverPhone,
+          if (p.clinicName != null) 'clinicName': p.clinicName,
           'riskLevel': p.riskLevel,
+          'riskScore': p.riskScore,
+          'adherencePercentage30Days': p.adherencePercentage30Days,
+          'takenDoses30Days': p.takenDoses30Days,
+          'missedDoses30Days': p.missedDoses30Days,
+          'lastAdherenceLogAt': p.lastAdherenceLogAt != null
+              ? Timestamp.fromDate(p.lastAdherenceLogAt!)
+              : null,
           'createdAt': Timestamp.fromDate(p.createdAt),
           'updatedAt': Timestamp.fromDate(p.updatedAt),
         },
         SetOptions(merge: true),
       );
+      debugPrint('[Sync] Risk summary synced to Firebase for patient ${p.id}.');
       await _db.patientsDao.markAsSynced(p.id);
       count++;
     }
@@ -208,10 +218,17 @@ class SyncService {
         remoteUpdatedAt: remoteUpdatedAt,
         localIsSynced: local.isSynced,
       )) {
+        final lastLogTs = data['lastAdherenceLogAt'] as Timestamp?;
         await _db.patientsDao.updatePatientFields(
           localId,
           PatientsCompanion(
             riskLevel: Value(data['riskLevel'] as String? ?? kRiskLow),
+            riskScore: Value(data['riskScore'] as int?),
+            adherencePercentage30Days:
+                Value((data['adherencePercentage30Days'] as num?)?.toDouble()),
+            takenDoses30Days: Value(data['takenDoses30Days'] as int?),
+            missedDoses30Days: Value(data['missedDoses30Days'] as int?),
+            lastAdherenceLogAt: Value(lastLogTs?.toDate()),
             caregiverPhone: Value(data['caregiverPhone'] as String?),
             language: Value(data['language'] as String? ?? 'en'),
             updatedAt: Value(remoteUpdatedAt),

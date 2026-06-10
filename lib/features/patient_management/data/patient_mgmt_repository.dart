@@ -6,6 +6,23 @@ import 'package:drift/drift.dart' show Value;
 import '../../../core/database/app_database.dart';
 import '../../../core/utils/constants.dart';
 
+/// Data for updating one medication's schedule from MedicationScheduleScreen.
+class MedScheduleEntry {
+  final int? existingId; // null = new medication to insert
+  final String name;
+  final String dosage;
+  final List<String> times; // HH:mm strings
+  final bool active;
+
+  const MedScheduleEntry({
+    this.existingId,
+    required this.name,
+    required this.dosage,
+    required this.times,
+    required this.active,
+  });
+}
+
 /// Data for one medication + its reminder times collected from the UI.
 class MedicationRegistrationData {
   final String name;
@@ -59,6 +76,7 @@ class PatientMgmtRepository {
     required String fullName,
     required String clinicCode,
     required String conditions,
+    String? clinicName,
     String? caregiverPhone,
     required List<MedicationRegistrationData> medications,
   }) async {
@@ -67,6 +85,8 @@ class PatientMgmtRepository {
       final now = DateTime.now();
       final caregiver =
           (caregiverPhone == null || caregiverPhone.isEmpty) ? null : caregiverPhone;
+      final resolvedClinicName =
+          (clinicName == null || clinicName.isEmpty) ? null : clinicName;
 
       // 1. Persist patient locally.
       final patientId = await _db.patientsDao.insertPatient(
@@ -78,6 +98,7 @@ class PatientMgmtRepository {
           gender: const Value('other'),
           pinHash: const Value(''),
           caregiverPhone: Value(caregiver),
+          clinicName: Value(resolvedClinicName),
           activationCode: Value(code),
           conditions: Value(conditions.isEmpty ? null : conditions),
           isActivated: const Value(false),
@@ -117,6 +138,7 @@ class PatientMgmtRepository {
           patientId: patientId,
           fullName: fullName,
           clinicCode: clinicCode,
+          clinicName: resolvedClinicName,
           conditions: conditions,
           caregiverPhone: caregiver,
           activationCode: code,
@@ -127,6 +149,102 @@ class PatientMgmtRepository {
     } catch (e) {
       return RegistrationFailure(e.toString());
     }
+  }
+
+  // ── Schedule management ────────────────────────────────────────────────────
+
+  /// Load a patient by local DB id.
+  Future<Patient?> getPatientById(int id) => _db.patientsDao.getPatientById(id);
+
+  /// Load a patient by their registration / clinic code.
+  Future<Patient?> getPatientByRegistrationCode(String code) =>
+      _db.patientsDao.getPatientByRegistrationCode(code);
+
+  /// Load all medications + their reminders for a patient.
+  Future<List<Medication>> getMedicationsForPatient(int patientId) =>
+      _db.medicationsDao.getMedicationsForPatient(patientId);
+
+  Future<List<Reminder>> getRemindersForPatient(int patientId) =>
+      _db.remindersDao.getRemindersForPatient(patientId);
+
+  /// Persist an updated medication schedule.
+  ///
+  /// For existing medications: updates fields + replaces all reminders.
+  /// For new entries (existingId == null): inserts medication + reminders.
+  /// Medications whose DB ids are in [removedIds] are deactivated (not deleted
+  /// so that adherence history is preserved).
+  Future<void> saveMedicationSchedule({
+    required int patientId,
+    required List<MedScheduleEntry> entries,
+    required List<int> removedIds,
+  }) async {
+    await _db.runInTransaction(() async {
+      for (final id in removedIds) {
+        await _db.medicationsDao.setMedicationActive(id, isActive: false);
+        await _db.remindersDao.deactivateRemindersForMedication(id);
+      }
+
+      for (final entry in entries) {
+        int medId;
+        final now = DateTime.now();
+
+        if (entry.existingId != null) {
+          medId = entry.existingId!;
+          await _db.medicationsDao.updateMedicationFields(
+            medId,
+            MedicationsCompanion(
+              name: Value(entry.name),
+              dosage: Value(entry.dosage),
+              frequency: Value(
+                  entry.times.length == 1 ? 'daily' : 'custom'),
+              customTimes: Value(entry.times.join(',')),
+              isActive: Value(entry.active),
+              isSynced: const Value(false),
+              updatedAt: Value(now),
+            ),
+          );
+          // Replace reminders: delete old, insert new
+          await _db.remindersDao.deleteRemindersForMedication(medId);
+        } else {
+          medId = await _db.medicationsDao.insertMedication(
+            MedicationsCompanion(
+              patientId: Value(patientId),
+              name: Value(entry.name),
+              dosage: Value(entry.dosage),
+              frequency: Value(
+                  entry.times.length == 1 ? 'daily' : 'custom'),
+              customTimes: Value(entry.times.join(',')),
+              startDate: Value(now.toIso8601String().substring(0, 10)),
+              isActive: Value(entry.active),
+              isSynced: const Value(false),
+            ),
+          );
+        }
+
+        if (entry.active) {
+          for (final time in entry.times) {
+            await _db.remindersDao.insertReminder(
+              RemindersCompanion(
+                patientId: Value(patientId),
+                medicationId: Value(medId),
+                scheduledTime: Value(time),
+                isActive: const Value(true),
+                isSynced: const Value(false),
+              ),
+            );
+          }
+        }
+      }
+
+      // Mark patient as unsynced so sync picks up the schedule change
+      await _db.patientsDao.updatePatientFields(
+        patientId,
+        PatientsCompanion(
+          isSynced: const Value(false),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+    });
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -153,6 +271,7 @@ class PatientMgmtRepository {
     required int patientId,
     required String fullName,
     required String clinicCode,
+    String? clinicName,
     required String conditions,
     required String? caregiverPhone,
     required String activationCode,
@@ -171,6 +290,7 @@ class PatientMgmtRepository {
         'fullName': fullName,
         'conditions': conditions,
         'caregiverPhone': caregiverPhone,
+        if (clinicName != null) 'clinicName': clinicName,
         'riskLevel': kRiskLow,
         'activationCode': activationCode,
         'isActivated': false,

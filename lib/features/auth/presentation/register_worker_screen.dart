@@ -73,7 +73,13 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
 
     switch (result) {
       case AuthSuccess(:final userId):
-        context.read<SessionProvider>().signInAsWorker(userId);
+        context.read<SessionProvider>().signInAsWorker(
+          userId,
+          clinicName: _clinicNameCtrl.text.trim().isEmpty
+              ? null
+              : _clinicNameCtrl.text.trim(),
+          fullName: _fullNameCtrl.text.trim(),
+        );
         context.go(AppRoutes.dashboard);
       case AuthFailure(:final message):
         _showSnack(message);

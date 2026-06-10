@@ -51,6 +51,26 @@ class Patients extends Table {
   // Comma-separated medical conditions e.g. "HIV,TB,Hypertension".
   TextColumn get conditions => text().nullable()();
 
+  // ── Risk summary fields — updated by RiskEngine after every dose log ─────────
+
+  // 0–100 numeric risk score (higher = riskier). Null until first calculation.
+  IntColumn get riskScore => integer().named('risk_score').nullable()();
+
+  // Adherence percentage over the last 30 days (0.0–100.0 scale).
+  RealColumn get adherencePercentage30Days =>
+      real().named('adherence_percentage_30d').nullable()();
+
+  // Raw counts for the 30-day window.
+  IntColumn get takenDoses30Days => integer().named('taken_doses_30d').nullable()();
+  IntColumn get missedDoses30Days => integer().named('missed_doses_30d').nullable()();
+
+  // When the most recent adherence log was recorded for this patient.
+  DateTimeColumn get lastAdherenceLogAt =>
+      dateTime().named('last_adherence_log_at').nullable()();
+
+  // Clinic name — set when a worker registers the patient; used for filtering.
+  TextColumn get clinicName => text().named('clinic_name').nullable()();
+
   // Whether the patient record has been synced to the backend
   BoolColumn get isSynced =>
       boolean().named('is_synced').withDefault(const Constant(false))();

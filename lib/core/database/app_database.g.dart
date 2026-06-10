@@ -172,6 +172,72 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _riskScoreMeta = const VerificationMeta(
+    'riskScore',
+  );
+  @override
+  late final GeneratedColumn<int> riskScore = GeneratedColumn<int>(
+    'risk_score',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _adherencePercentage30DaysMeta =
+      const VerificationMeta('adherencePercentage30Days');
+  @override
+  late final GeneratedColumn<double> adherencePercentage30Days =
+      GeneratedColumn<double>(
+        'adherence_percentage_30d',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _takenDoses30DaysMeta = const VerificationMeta(
+    'takenDoses30Days',
+  );
+  @override
+  late final GeneratedColumn<int> takenDoses30Days = GeneratedColumn<int>(
+    'taken_doses_30d',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _missedDoses30DaysMeta = const VerificationMeta(
+    'missedDoses30Days',
+  );
+  @override
+  late final GeneratedColumn<int> missedDoses30Days = GeneratedColumn<int>(
+    'missed_doses_30d',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastAdherenceLogAtMeta =
+      const VerificationMeta('lastAdherenceLogAt');
+  @override
+  late final GeneratedColumn<DateTime> lastAdherenceLogAt =
+      GeneratedColumn<DateTime>(
+        'last_adherence_log_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _clinicNameMeta = const VerificationMeta(
+    'clinicName',
+  );
+  @override
+  late final GeneratedColumn<String> clinicName = GeneratedColumn<String>(
+    'clinic_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isSyncedMeta = const VerificationMeta(
     'isSynced',
   );
@@ -227,6 +293,12 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     isActivated,
     activatedAt,
     conditions,
+    riskScore,
+    adherencePercentage30Days,
+    takenDoses30Days,
+    missedDoses30Days,
+    lastAdherenceLogAt,
+    clinicName,
     isSynced,
     createdAt,
     updatedAt,
@@ -357,6 +429,54 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         conditions.isAcceptableOrUnknown(data['conditions']!, _conditionsMeta),
       );
     }
+    if (data.containsKey('risk_score')) {
+      context.handle(
+        _riskScoreMeta,
+        riskScore.isAcceptableOrUnknown(data['risk_score']!, _riskScoreMeta),
+      );
+    }
+    if (data.containsKey('adherence_percentage_30d')) {
+      context.handle(
+        _adherencePercentage30DaysMeta,
+        adherencePercentage30Days.isAcceptableOrUnknown(
+          data['adherence_percentage_30d']!,
+          _adherencePercentage30DaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('taken_doses_30d')) {
+      context.handle(
+        _takenDoses30DaysMeta,
+        takenDoses30Days.isAcceptableOrUnknown(
+          data['taken_doses_30d']!,
+          _takenDoses30DaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('missed_doses_30d')) {
+      context.handle(
+        _missedDoses30DaysMeta,
+        missedDoses30Days.isAcceptableOrUnknown(
+          data['missed_doses_30d']!,
+          _missedDoses30DaysMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_adherence_log_at')) {
+      context.handle(
+        _lastAdherenceLogAtMeta,
+        lastAdherenceLogAt.isAcceptableOrUnknown(
+          data['last_adherence_log_at']!,
+          _lastAdherenceLogAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('clinic_name')) {
+      context.handle(
+        _clinicNameMeta,
+        clinicName.isAcceptableOrUnknown(data['clinic_name']!, _clinicNameMeta),
+      );
+    }
     if (data.containsKey('is_synced')) {
       context.handle(
         _isSyncedMeta,
@@ -440,6 +560,30 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         DriftSqlType.string,
         data['${effectivePrefix}conditions'],
       ),
+      riskScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}risk_score'],
+      ),
+      adherencePercentage30Days: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}adherence_percentage_30d'],
+      ),
+      takenDoses30Days: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}taken_doses_30d'],
+      ),
+      missedDoses30Days: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}missed_doses_30d'],
+      ),
+      lastAdherenceLogAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_adherence_log_at'],
+      ),
+      clinicName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}clinic_name'],
+      ),
       isSynced: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_synced'],
@@ -476,6 +620,12 @@ class Patient extends DataClass implements Insertable<Patient> {
   final bool isActivated;
   final DateTime? activatedAt;
   final String? conditions;
+  final int? riskScore;
+  final double? adherencePercentage30Days;
+  final int? takenDoses30Days;
+  final int? missedDoses30Days;
+  final DateTime? lastAdherenceLogAt;
+  final String? clinicName;
   final bool isSynced;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -494,6 +644,12 @@ class Patient extends DataClass implements Insertable<Patient> {
     required this.isActivated,
     this.activatedAt,
     this.conditions,
+    this.riskScore,
+    this.adherencePercentage30Days,
+    this.takenDoses30Days,
+    this.missedDoses30Days,
+    this.lastAdherenceLogAt,
+    this.clinicName,
     required this.isSynced,
     required this.createdAt,
     required this.updatedAt,
@@ -522,6 +678,26 @@ class Patient extends DataClass implements Insertable<Patient> {
     }
     if (!nullToAbsent || conditions != null) {
       map['conditions'] = Variable<String>(conditions);
+    }
+    if (!nullToAbsent || riskScore != null) {
+      map['risk_score'] = Variable<int>(riskScore);
+    }
+    if (!nullToAbsent || adherencePercentage30Days != null) {
+      map['adherence_percentage_30d'] = Variable<double>(
+        adherencePercentage30Days,
+      );
+    }
+    if (!nullToAbsent || takenDoses30Days != null) {
+      map['taken_doses_30d'] = Variable<int>(takenDoses30Days);
+    }
+    if (!nullToAbsent || missedDoses30Days != null) {
+      map['missed_doses_30d'] = Variable<int>(missedDoses30Days);
+    }
+    if (!nullToAbsent || lastAdherenceLogAt != null) {
+      map['last_adherence_log_at'] = Variable<DateTime>(lastAdherenceLogAt);
+    }
+    if (!nullToAbsent || clinicName != null) {
+      map['clinic_name'] = Variable<String>(clinicName);
     }
     map['is_synced'] = Variable<bool>(isSynced);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -553,6 +729,25 @@ class Patient extends DataClass implements Insertable<Patient> {
       conditions: conditions == null && nullToAbsent
           ? const Value.absent()
           : Value(conditions),
+      riskScore: riskScore == null && nullToAbsent
+          ? const Value.absent()
+          : Value(riskScore),
+      adherencePercentage30Days:
+          adherencePercentage30Days == null && nullToAbsent
+          ? const Value.absent()
+          : Value(adherencePercentage30Days),
+      takenDoses30Days: takenDoses30Days == null && nullToAbsent
+          ? const Value.absent()
+          : Value(takenDoses30Days),
+      missedDoses30Days: missedDoses30Days == null && nullToAbsent
+          ? const Value.absent()
+          : Value(missedDoses30Days),
+      lastAdherenceLogAt: lastAdherenceLogAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAdherenceLogAt),
+      clinicName: clinicName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clinicName),
       isSynced: Value(isSynced),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -579,6 +774,16 @@ class Patient extends DataClass implements Insertable<Patient> {
       isActivated: serializer.fromJson<bool>(json['isActivated']),
       activatedAt: serializer.fromJson<DateTime?>(json['activatedAt']),
       conditions: serializer.fromJson<String?>(json['conditions']),
+      riskScore: serializer.fromJson<int?>(json['riskScore']),
+      adherencePercentage30Days: serializer.fromJson<double?>(
+        json['adherencePercentage30Days'],
+      ),
+      takenDoses30Days: serializer.fromJson<int?>(json['takenDoses30Days']),
+      missedDoses30Days: serializer.fromJson<int?>(json['missedDoses30Days']),
+      lastAdherenceLogAt: serializer.fromJson<DateTime?>(
+        json['lastAdherenceLogAt'],
+      ),
+      clinicName: serializer.fromJson<String?>(json['clinicName']),
       isSynced: serializer.fromJson<bool>(json['isSynced']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -602,6 +807,14 @@ class Patient extends DataClass implements Insertable<Patient> {
       'isActivated': serializer.toJson<bool>(isActivated),
       'activatedAt': serializer.toJson<DateTime?>(activatedAt),
       'conditions': serializer.toJson<String?>(conditions),
+      'riskScore': serializer.toJson<int?>(riskScore),
+      'adherencePercentage30Days': serializer.toJson<double?>(
+        adherencePercentage30Days,
+      ),
+      'takenDoses30Days': serializer.toJson<int?>(takenDoses30Days),
+      'missedDoses30Days': serializer.toJson<int?>(missedDoses30Days),
+      'lastAdherenceLogAt': serializer.toJson<DateTime?>(lastAdherenceLogAt),
+      'clinicName': serializer.toJson<String?>(clinicName),
       'isSynced': serializer.toJson<bool>(isSynced),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -623,6 +836,12 @@ class Patient extends DataClass implements Insertable<Patient> {
     bool? isActivated,
     Value<DateTime?> activatedAt = const Value.absent(),
     Value<String?> conditions = const Value.absent(),
+    Value<int?> riskScore = const Value.absent(),
+    Value<double?> adherencePercentage30Days = const Value.absent(),
+    Value<int?> takenDoses30Days = const Value.absent(),
+    Value<int?> missedDoses30Days = const Value.absent(),
+    Value<DateTime?> lastAdherenceLogAt = const Value.absent(),
+    Value<String?> clinicName = const Value.absent(),
     bool? isSynced,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -645,6 +864,20 @@ class Patient extends DataClass implements Insertable<Patient> {
     isActivated: isActivated ?? this.isActivated,
     activatedAt: activatedAt.present ? activatedAt.value : this.activatedAt,
     conditions: conditions.present ? conditions.value : this.conditions,
+    riskScore: riskScore.present ? riskScore.value : this.riskScore,
+    adherencePercentage30Days: adherencePercentage30Days.present
+        ? adherencePercentage30Days.value
+        : this.adherencePercentage30Days,
+    takenDoses30Days: takenDoses30Days.present
+        ? takenDoses30Days.value
+        : this.takenDoses30Days,
+    missedDoses30Days: missedDoses30Days.present
+        ? missedDoses30Days.value
+        : this.missedDoses30Days,
+    lastAdherenceLogAt: lastAdherenceLogAt.present
+        ? lastAdherenceLogAt.value
+        : this.lastAdherenceLogAt,
+    clinicName: clinicName.present ? clinicName.value : this.clinicName,
     isSynced: isSynced ?? this.isSynced,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -681,6 +914,22 @@ class Patient extends DataClass implements Insertable<Patient> {
       conditions: data.conditions.present
           ? data.conditions.value
           : this.conditions,
+      riskScore: data.riskScore.present ? data.riskScore.value : this.riskScore,
+      adherencePercentage30Days: data.adherencePercentage30Days.present
+          ? data.adherencePercentage30Days.value
+          : this.adherencePercentage30Days,
+      takenDoses30Days: data.takenDoses30Days.present
+          ? data.takenDoses30Days.value
+          : this.takenDoses30Days,
+      missedDoses30Days: data.missedDoses30Days.present
+          ? data.missedDoses30Days.value
+          : this.missedDoses30Days,
+      lastAdherenceLogAt: data.lastAdherenceLogAt.present
+          ? data.lastAdherenceLogAt.value
+          : this.lastAdherenceLogAt,
+      clinicName: data.clinicName.present
+          ? data.clinicName.value
+          : this.clinicName,
       isSynced: data.isSynced.present ? data.isSynced.value : this.isSynced,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -704,6 +953,12 @@ class Patient extends DataClass implements Insertable<Patient> {
           ..write('isActivated: $isActivated, ')
           ..write('activatedAt: $activatedAt, ')
           ..write('conditions: $conditions, ')
+          ..write('riskScore: $riskScore, ')
+          ..write('adherencePercentage30Days: $adherencePercentage30Days, ')
+          ..write('takenDoses30Days: $takenDoses30Days, ')
+          ..write('missedDoses30Days: $missedDoses30Days, ')
+          ..write('lastAdherenceLogAt: $lastAdherenceLogAt, ')
+          ..write('clinicName: $clinicName, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -712,7 +967,7 @@ class Patient extends DataClass implements Insertable<Patient> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     registrationCode,
     fullName,
@@ -727,10 +982,16 @@ class Patient extends DataClass implements Insertable<Patient> {
     isActivated,
     activatedAt,
     conditions,
+    riskScore,
+    adherencePercentage30Days,
+    takenDoses30Days,
+    missedDoses30Days,
+    lastAdherenceLogAt,
+    clinicName,
     isSynced,
     createdAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -749,6 +1010,12 @@ class Patient extends DataClass implements Insertable<Patient> {
           other.isActivated == this.isActivated &&
           other.activatedAt == this.activatedAt &&
           other.conditions == this.conditions &&
+          other.riskScore == this.riskScore &&
+          other.adherencePercentage30Days == this.adherencePercentage30Days &&
+          other.takenDoses30Days == this.takenDoses30Days &&
+          other.missedDoses30Days == this.missedDoses30Days &&
+          other.lastAdherenceLogAt == this.lastAdherenceLogAt &&
+          other.clinicName == this.clinicName &&
           other.isSynced == this.isSynced &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -769,6 +1036,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
   final Value<bool> isActivated;
   final Value<DateTime?> activatedAt;
   final Value<String?> conditions;
+  final Value<int?> riskScore;
+  final Value<double?> adherencePercentage30Days;
+  final Value<int?> takenDoses30Days;
+  final Value<int?> missedDoses30Days;
+  final Value<DateTime?> lastAdherenceLogAt;
+  final Value<String?> clinicName;
   final Value<bool> isSynced;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -787,6 +1060,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     this.isActivated = const Value.absent(),
     this.activatedAt = const Value.absent(),
     this.conditions = const Value.absent(),
+    this.riskScore = const Value.absent(),
+    this.adherencePercentage30Days = const Value.absent(),
+    this.takenDoses30Days = const Value.absent(),
+    this.missedDoses30Days = const Value.absent(),
+    this.lastAdherenceLogAt = const Value.absent(),
+    this.clinicName = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -806,6 +1085,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     this.isActivated = const Value.absent(),
     this.activatedAt = const Value.absent(),
     this.conditions = const Value.absent(),
+    this.riskScore = const Value.absent(),
+    this.adherencePercentage30Days = const Value.absent(),
+    this.takenDoses30Days = const Value.absent(),
+    this.missedDoses30Days = const Value.absent(),
+    this.lastAdherenceLogAt = const Value.absent(),
+    this.clinicName = const Value.absent(),
     this.isSynced = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -830,6 +1115,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Expression<bool>? isActivated,
     Expression<DateTime>? activatedAt,
     Expression<String>? conditions,
+    Expression<int>? riskScore,
+    Expression<double>? adherencePercentage30Days,
+    Expression<int>? takenDoses30Days,
+    Expression<int>? missedDoses30Days,
+    Expression<DateTime>? lastAdherenceLogAt,
+    Expression<String>? clinicName,
     Expression<bool>? isSynced,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -849,6 +1140,14 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       if (isActivated != null) 'is_activated': isActivated,
       if (activatedAt != null) 'activated_at': activatedAt,
       if (conditions != null) 'conditions': conditions,
+      if (riskScore != null) 'risk_score': riskScore,
+      if (adherencePercentage30Days != null)
+        'adherence_percentage_30d': adherencePercentage30Days,
+      if (takenDoses30Days != null) 'taken_doses_30d': takenDoses30Days,
+      if (missedDoses30Days != null) 'missed_doses_30d': missedDoses30Days,
+      if (lastAdherenceLogAt != null)
+        'last_adherence_log_at': lastAdherenceLogAt,
+      if (clinicName != null) 'clinic_name': clinicName,
       if (isSynced != null) 'is_synced': isSynced,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -870,6 +1169,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Value<bool>? isActivated,
     Value<DateTime?>? activatedAt,
     Value<String?>? conditions,
+    Value<int?>? riskScore,
+    Value<double?>? adherencePercentage30Days,
+    Value<int?>? takenDoses30Days,
+    Value<int?>? missedDoses30Days,
+    Value<DateTime?>? lastAdherenceLogAt,
+    Value<String?>? clinicName,
     Value<bool>? isSynced,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -889,6 +1194,13 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       isActivated: isActivated ?? this.isActivated,
       activatedAt: activatedAt ?? this.activatedAt,
       conditions: conditions ?? this.conditions,
+      riskScore: riskScore ?? this.riskScore,
+      adherencePercentage30Days:
+          adherencePercentage30Days ?? this.adherencePercentage30Days,
+      takenDoses30Days: takenDoses30Days ?? this.takenDoses30Days,
+      missedDoses30Days: missedDoses30Days ?? this.missedDoses30Days,
+      lastAdherenceLogAt: lastAdherenceLogAt ?? this.lastAdherenceLogAt,
+      clinicName: clinicName ?? this.clinicName,
       isSynced: isSynced ?? this.isSynced,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -940,6 +1252,28 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     if (conditions.present) {
       map['conditions'] = Variable<String>(conditions.value);
     }
+    if (riskScore.present) {
+      map['risk_score'] = Variable<int>(riskScore.value);
+    }
+    if (adherencePercentage30Days.present) {
+      map['adherence_percentage_30d'] = Variable<double>(
+        adherencePercentage30Days.value,
+      );
+    }
+    if (takenDoses30Days.present) {
+      map['taken_doses_30d'] = Variable<int>(takenDoses30Days.value);
+    }
+    if (missedDoses30Days.present) {
+      map['missed_doses_30d'] = Variable<int>(missedDoses30Days.value);
+    }
+    if (lastAdherenceLogAt.present) {
+      map['last_adherence_log_at'] = Variable<DateTime>(
+        lastAdherenceLogAt.value,
+      );
+    }
+    if (clinicName.present) {
+      map['clinic_name'] = Variable<String>(clinicName.value);
+    }
     if (isSynced.present) {
       map['is_synced'] = Variable<bool>(isSynced.value);
     }
@@ -969,6 +1303,12 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
           ..write('isActivated: $isActivated, ')
           ..write('activatedAt: $activatedAt, ')
           ..write('conditions: $conditions, ')
+          ..write('riskScore: $riskScore, ')
+          ..write('adherencePercentage30Days: $adherencePercentage30Days, ')
+          ..write('takenDoses30Days: $takenDoses30Days, ')
+          ..write('missedDoses30Days: $missedDoses30Days, ')
+          ..write('lastAdherenceLogAt: $lastAdherenceLogAt, ')
+          ..write('clinicName: $clinicName, ')
           ..write('isSynced: $isSynced, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -3494,6 +3834,12 @@ typedef $$PatientsTableCreateCompanionBuilder =
       Value<bool> isActivated,
       Value<DateTime?> activatedAt,
       Value<String?> conditions,
+      Value<int?> riskScore,
+      Value<double?> adherencePercentage30Days,
+      Value<int?> takenDoses30Days,
+      Value<int?> missedDoses30Days,
+      Value<DateTime?> lastAdherenceLogAt,
+      Value<String?> clinicName,
       Value<bool> isSynced,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -3514,6 +3860,12 @@ typedef $$PatientsTableUpdateCompanionBuilder =
       Value<bool> isActivated,
       Value<DateTime?> activatedAt,
       Value<String?> conditions,
+      Value<int?> riskScore,
+      Value<double?> adherencePercentage30Days,
+      Value<int?> takenDoses30Days,
+      Value<int?> missedDoses30Days,
+      Value<DateTime?> lastAdherenceLogAt,
+      Value<String?> clinicName,
       Value<bool> isSynced,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -3654,6 +4006,36 @@ class $$PatientsTableFilterComposer
 
   ColumnFilters<String> get conditions => $composableBuilder(
     column: $table.conditions,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get riskScore => $composableBuilder(
+    column: $table.riskScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get adherencePercentage30Days => $composableBuilder(
+    column: $table.adherencePercentage30Days,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get takenDoses30Days => $composableBuilder(
+    column: $table.takenDoses30Days,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get missedDoses30Days => $composableBuilder(
+    column: $table.missedDoses30Days,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastAdherenceLogAt => $composableBuilder(
+    column: $table.lastAdherenceLogAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clinicName => $composableBuilder(
+    column: $table.clinicName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3827,6 +4209,36 @@ class $$PatientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get riskScore => $composableBuilder(
+    column: $table.riskScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get adherencePercentage30Days => $composableBuilder(
+    column: $table.adherencePercentage30Days,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get takenDoses30Days => $composableBuilder(
+    column: $table.takenDoses30Days,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get missedDoses30Days => $composableBuilder(
+    column: $table.missedDoses30Days,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastAdherenceLogAt => $composableBuilder(
+    column: $table.lastAdherenceLogAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clinicName => $composableBuilder(
+    column: $table.clinicName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isSynced => $composableBuilder(
     column: $table.isSynced,
     builder: (column) => ColumnOrderings(column),
@@ -3907,6 +4319,34 @@ class $$PatientsTableAnnotationComposer
 
   GeneratedColumn<String> get conditions => $composableBuilder(
     column: $table.conditions,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get riskScore =>
+      $composableBuilder(column: $table.riskScore, builder: (column) => column);
+
+  GeneratedColumn<double> get adherencePercentage30Days => $composableBuilder(
+    column: $table.adherencePercentage30Days,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get takenDoses30Days => $composableBuilder(
+    column: $table.takenDoses30Days,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get missedDoses30Days => $composableBuilder(
+    column: $table.missedDoses30Days,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastAdherenceLogAt => $composableBuilder(
+    column: $table.lastAdherenceLogAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get clinicName => $composableBuilder(
+    column: $table.clinicName,
     builder: (column) => column,
   );
 
@@ -4041,6 +4481,12 @@ class $$PatientsTableTableManager
                 Value<bool> isActivated = const Value.absent(),
                 Value<DateTime?> activatedAt = const Value.absent(),
                 Value<String?> conditions = const Value.absent(),
+                Value<int?> riskScore = const Value.absent(),
+                Value<double?> adherencePercentage30Days = const Value.absent(),
+                Value<int?> takenDoses30Days = const Value.absent(),
+                Value<int?> missedDoses30Days = const Value.absent(),
+                Value<DateTime?> lastAdherenceLogAt = const Value.absent(),
+                Value<String?> clinicName = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -4059,6 +4505,12 @@ class $$PatientsTableTableManager
                 isActivated: isActivated,
                 activatedAt: activatedAt,
                 conditions: conditions,
+                riskScore: riskScore,
+                adherencePercentage30Days: adherencePercentage30Days,
+                takenDoses30Days: takenDoses30Days,
+                missedDoses30Days: missedDoses30Days,
+                lastAdherenceLogAt: lastAdherenceLogAt,
+                clinicName: clinicName,
                 isSynced: isSynced,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -4079,6 +4531,12 @@ class $$PatientsTableTableManager
                 Value<bool> isActivated = const Value.absent(),
                 Value<DateTime?> activatedAt = const Value.absent(),
                 Value<String?> conditions = const Value.absent(),
+                Value<int?> riskScore = const Value.absent(),
+                Value<double?> adherencePercentage30Days = const Value.absent(),
+                Value<int?> takenDoses30Days = const Value.absent(),
+                Value<int?> missedDoses30Days = const Value.absent(),
+                Value<DateTime?> lastAdherenceLogAt = const Value.absent(),
+                Value<String?> clinicName = const Value.absent(),
                 Value<bool> isSynced = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -4097,6 +4555,12 @@ class $$PatientsTableTableManager
                 isActivated: isActivated,
                 activatedAt: activatedAt,
                 conditions: conditions,
+                riskScore: riskScore,
+                adherencePercentage30Days: adherencePercentage30Days,
+                takenDoses30Days: takenDoses30Days,
+                missedDoses30Days: missedDoses30Days,
+                lastAdherenceLogAt: lastAdherenceLogAt,
+                clinicName: clinicName,
                 isSynced: isSynced,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

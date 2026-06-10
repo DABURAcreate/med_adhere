@@ -54,11 +54,23 @@ class PatientsDao extends DatabaseAccessor<AppDatabase>
   Future<List<Patient>> getPatientsByRiskLevel(String riskLevel) =>
       (select(patients)..where((p) => p.riskLevel.equals(riskLevel))).get();
 
+  /// Watch patients filtered by risk level — live stream for dashboard widgets.
+  Stream<List<Patient>> watchPatientsByRiskLevel(String riskLevel) =>
+      (select(patients)..where((p) => p.riskLevel.equals(riskLevel))).watch();
+
   /// Search patients by name — case-insensitive partial match.
   /// Powers the search bar in patient_list_screen.dart.
   Future<List<Patient>> searchPatients(String query) => (select(patients)
     ..where((p) => p.fullName.lower().like('%${query.toLowerCase()}%')))
       .get();
+
+  /// Fetch patients belonging to a specific clinic.
+  Future<List<Patient>> getPatientsByClinic(String clinicName) =>
+      (select(patients)..where((p) => p.clinicName.equals(clinicName))).get();
+
+  /// Watch patients belonging to a specific clinic — live stream for clinic-filtered views.
+  Stream<List<Patient>> watchPatientsByClinic(String clinicName) =>
+      (select(patients)..where((p) => p.clinicName.equals(clinicName))).watch();
 
   /// Fetch all patients that have not yet been synced to the backend.
   /// Called by sync_service.dart when connectivity is restored.
@@ -94,6 +106,32 @@ class PatientsDao extends DatabaseAccessor<AppDatabase>
       updatedAt: Value(DateTime.now()),
     ),
   );
+
+  /// Persist the full risk summary computed by RiskEngine.
+  /// Updates riskLevel, riskScore, adherence stats, and marks the patient
+  /// as unsynced so SyncService will push the updated summary to Firestore.
+  Future<int> updateRiskSummary(
+    int id, {
+    required String riskLevel,
+    required int riskScore,
+    required double adherencePercentage30Days,
+    required int takenDoses30Days,
+    required int missedDoses30Days,
+    required DateTime? lastAdherenceLogAt,
+  }) =>
+      updatePatientFields(
+        id,
+        PatientsCompanion(
+          riskLevel: Value(riskLevel),
+          riskScore: Value(riskScore),
+          adherencePercentage30Days: Value(adherencePercentage30Days),
+          takenDoses30Days: Value(takenDoses30Days),
+          missedDoses30Days: Value(missedDoses30Days),
+          lastAdherenceLogAt: Value(lastAdherenceLogAt),
+          isSynced: const Value(false),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 
   /// Update the patient's PIN hash — called by auth_service.dart on PIN change.
   Future<int> updatePinHash(int id, String pinHash) => updatePatientFields(

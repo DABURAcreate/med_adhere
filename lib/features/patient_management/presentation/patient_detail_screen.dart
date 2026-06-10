@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../../app/router.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/utils/constants.dart';
+import '../../patient/data/adherence_repository.dart';
+import '../data/patient_mgmt_repository.dart';
 
 // ── Colour palette (mirrors patient_list_screen) ──────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
@@ -12,136 +17,9 @@ const kP5 = Color(0xFF238F9C);
 const kBg = Color(0xFFF0F5FB);
 const kCard = Color(0xFFFFFFFF);
 
-// ── Fake data models ──────────────────────────────────────────────────────────
-enum RiskLevel { high, medium, low }
-
-class _AdherenceDay {
-  final DateTime date;
-  final bool? taken; // null = no data / future
-
-  const _AdherenceDay({required this.date, required this.taken});
-}
-
-class _Medication {
-  final String name;
-  final String dosage;
-  final List<String> times;
-  final double adherence;
-
-  const _Medication({
-    required this.name,
-    required this.dosage,
-    required this.times,
-    required this.adherence,
-  });
-}
-
-class _FollowUpNote {
-  final String date;
-  final String note;
-  final String worker;
-
-  const _FollowUpNote({
-    required this.date,
-    required this.note,
-    required this.worker,
-  });
-}
-
-// ── Fake patient data keyed by ID ─────────────────────────────────────────────
-class _PatientData {
-  final String firstName;
-  final String lastName;
-  final String nationalId;
-  final String clinicCode;
-  final List<String> conditions;
-  final RiskLevel risk;
-  final double adherence30d;
-  final int missedDoses30d;
-  final List<_AdherenceDay> last14Days;
-  final List<_Medication> medications;
-  final String riskExplanation;
-  final List<_FollowUpNote> followUpLog;
-
-  const _PatientData({
-    required this.firstName,
-    required this.lastName,
-    required this.nationalId,
-    required this.clinicCode,
-    required this.conditions,
-    required this.risk,
-    required this.adherence30d,
-    required this.missedDoses30d,
-    required this.last14Days,
-    required this.medications,
-    required this.riskExplanation,
-    required this.followUpLog,
-  });
-}
-
-_PatientData _fakePatientData(String patientId) {
-  // Generate stable fake data based on id
-  final today = DateTime.now();
-  final days = List.generate(14, (i) {
-    final d = today.subtract(Duration(days: 13 - i));
-    final taken = i < 12 ? (i % 4 != 2) : null;
-    return _AdherenceDay(date: d, taken: taken);
-  });
-
-  return _PatientData(
-    firstName: 'Sipho',
-    lastName: 'Dlamini',
-    nationalId: '9203145800081',
-    clinicCode: 'MBM-0041',
-    conditions: ['HIV', 'Hypertension'],
-    risk: RiskLevel.high,
-    adherence30d: 38.0,
-    missedDoses30d: 18,
-    last14Days: days,
-    medications: const [
-      _Medication(
-        name: 'Tenofovir / Lamivudine / Dolutegravir',
-        dosage: '300/300/50 mg',
-        times: ['08:00'],
-        adherence: 40.0,
-      ),
-      _Medication(
-        name: 'Amlodipine',
-        dosage: '5 mg',
-        times: ['08:00', '20:00'],
-        adherence: 35.0,
-      ),
-    ],
-    riskExplanation:
-    'This patient is classified as HIGH RISK based on:\n\n'
-        '• Adherence below 50% over the past 30 days\n'
-        '• 18 missed doses in the last month\n'
-        '• Last medication log recorded 2 days ago\n'
-        '• Two concurrent chronic conditions requiring strict adherence\n\n'
-        'Immediate follow-up is recommended to identify barriers and provide support.',
-    followUpLog: const [
-      _FollowUpNote(
-        date: '12 May 2025',
-        note: 'Patient reported forgetting morning doses. Discussed alarm reminder strategy.',
-        worker: 'Nurse Mokoena',
-      ),
-      _FollowUpNote(
-        date: '28 Apr 2025',
-        note: 'Phone follow-up — patient confirmed pills but no phone log recorded.',
-        worker: 'Nurse Mokoena',
-      ),
-      _FollowUpNote(
-        date: '10 Apr 2025',
-        note: 'Clinic visit. Medication collected. Adherence counselling provided.',
-        worker: 'Dr Khumalo',
-      ),
-    ],
-  );
-}
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 class PatientDetailScreen extends StatefulWidget {
-  final String patientId;
+  final String patientId; // registration code from the route
 
   const PatientDetailScreen({super.key, required this.patientId});
 
@@ -150,40 +28,149 @@ class PatientDetailScreen extends StatefulWidget {
 }
 
 class _PatientDetailScreenState extends State<PatientDetailScreen> {
+  bool _loading = true;
+  String? _error;
+
+  Patient? _patient;
+  List<Medication> _medications = [];
+  List<Reminder> _reminders = [];
+  List<AdherenceLog> _last14DayLogs = [];
+
   bool _riskExpanded = false;
-  late _PatientData _patient;
 
   @override
   void initState() {
     super.initState();
-    _patient = _fakePatientData(widget.patientId);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final repo = context.read<PatientMgmtRepository>();
+      final adherenceRepo = context.read<AdherenceRepository>();
+
+      final patient =
+          await repo.getPatientByRegistrationCode(widget.patientId);
+
+      if (patient == null) {
+        setState(() {
+          _error = 'Patient not found.';
+          _loading = false;
+        });
+        return;
+      }
+
+      final meds = await repo.getMedicationsForPatient(patient.id);
+      final reminders = await repo.getRemindersForPatient(patient.id);
+
+      final now = DateTime.now();
+      final from = now.subtract(const Duration(days: 13));
+      final logs = await adherenceRepo.getLogsInRange(
+        patientId: patient.id,
+        from: DateTime(from.year, from.month, from.day),
+        to: DateTime(now.year, now.month, now.day, 23, 59, 59),
+      );
+
+      debugPrint('[PatientDetail] Loaded patient ${patient.fullName} (id=${patient.id}) from repository.');
+
+      if (mounted) {
+        setState(() {
+          _patient = patient;
+          _medications = meds;
+          _reminders = reminders;
+          _last14DayLogs = logs;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load patient data: $e';
+          _loading = false;
+        });
+      }
+    }
   }
 
   // ── Risk helpers ─────────────────────────────────────────────────────────────
-  Color _riskColor(RiskLevel r) => switch (r) {
-    RiskLevel.high => const Color(0xFFB91C1C),
-    RiskLevel.medium => const Color(0xFFD97706),
-    RiskLevel.low => const Color(0xFF16A34A),
-  };
+  Color _riskColor(String riskLevel) => switch (riskLevel) {
+        kRiskHigh => const Color(0xFFB91C1C),
+        kRiskMedium => const Color(0xFFD97706),
+        _ => const Color(0xFF16A34A),
+      };
 
-  String _riskLabel(RiskLevel r) => switch (r) {
-    RiskLevel.high => 'High Risk',
-    RiskLevel.medium => 'Med Risk',
-    RiskLevel.low => 'Low Risk',
-  };
+  String _riskLabel(String riskLevel) => switch (riskLevel) {
+        kRiskHigh => 'High Risk',
+        kRiskMedium => 'Med Risk',
+        _ => 'Low Risk',
+      };
 
-  Color _adherenceColor(double v) =>
-      v >= 80 ? const Color(0xFF16A34A) : v >= 60 ? const Color(0xFFD97706) : const Color(0xFFB91C1C);
+  Color _adherenceColor(double v) => v >= 80
+      ? const Color(0xFF16A34A)
+      : v >= 60
+          ? const Color(0xFFD97706)
+          : const Color(0xFFB91C1C);
+
+  // ── Calendar helpers ─────────────────────────────────────────────────────────
+
+  /// For each of the last 14 days, returns true=taken, false=missed, null=no data.
+  List<({DateTime date, bool? taken})> _get14DayStrip() {
+    final today = DateTime.now();
+    final result = <({DateTime date, bool? taken})>[];
+
+    for (int i = 13; i >= 0; i--) {
+      final day = today.subtract(Duration(days: i));
+      final dayStart = DateTime(day.year, day.month, day.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+
+      final dayLogs = _last14DayLogs.where((l) =>
+          l.scheduledAt.isAfter(dayStart) &&
+          l.scheduledAt.isBefore(dayEnd)).toList();
+
+      if (dayLogs.isEmpty) {
+        result.add((date: dayStart, taken: null));
+      } else {
+        final hasTaken = dayLogs
+            .any((l) => l.status == kStatusTaken || l.status == kStatusLate);
+        result.add((date: dayStart, taken: hasTaken));
+      }
+    }
+    return result;
+  }
 
   // ── Build ────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final p = _patient;
-    final rc = _riskColor(p.risk);
+    if (_loading) {
+      return Scaffold(
+        backgroundColor: kBg,
+        appBar: _buildSimpleAppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_error != null || _patient == null) {
+      return Scaffold(
+        backgroundColor: kBg,
+        appBar: _buildSimpleAppBar(),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              _error ?? 'Patient not found.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final p = _patient!;
+    final rc = _riskColor(p.riskLevel);
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: _buildAppBar(context, p),
+      appBar: _buildAppBar(p),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 32),
         child: Column(
@@ -193,231 +180,247 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             const SizedBox(height: 12),
             _buildAdherenceSummary(p),
             const SizedBox(height: 12),
-            _buildMedicationsSection(p),
+            _buildMedicationsSection(),
             const SizedBox(height: 12),
             _buildRiskExplanation(p, rc),
             const SizedBox(height: 12),
-            _buildActions(context, p),
+            _buildActions(context),
             const SizedBox(height: 12),
-            _buildFollowUpLog(p),
+            _buildFollowUpLog(),
           ],
         ),
       ),
     );
   }
 
-  // ── App bar ──────────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar(BuildContext context, _PatientData p) => AppBar(
+  // ── Simple app bar (loading/error states) ────────────────────────────────────
+  PreferredSizeWidget _buildSimpleAppBar() => AppBar(
     backgroundColor: kP2,
     foregroundColor: Colors.white,
     elevation: 0,
-    centerTitle: false,
     leading: IconButton(
       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
       onPressed: () => context.pop(),
     ),
-    title: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${p.firstName} ${p.lastName}',
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          p.clinicCode,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Colors.white70,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+    title: Text(
+      widget.patientId,
+      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
     ),
-    actions: [
-      Container(
-        margin: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: _riskColor(p.risk).withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _riskColor(p.risk).withOpacity(0.5)),
-        ),
-        child: Text(
-          _riskLabel(p.risk),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: _riskColor(p.risk),
-          ),
-        ),
-      ),
-    ],
     flexibleSpace: Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [kP2, kP3],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-    ),
-    bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(4),
-      child: Container(
-        height: 4,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [kP4, kP5]),
-        ),
+            colors: [kP2, kP3],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight),
       ),
     ),
   );
 
-  // ── Patient header card ──────────────────────────────────────────────────────
-  Widget _buildPatientHeader(_PatientData p, Color rc) => Container(
-    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: kCard,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            // Avatar
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  '${p.firstName[0]}${p.lastName[0]}',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: kP2,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${p.firstName} ${p.lastName}',
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF1A1A2E),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.badge_rounded,
-                          size: 12, color: Colors.grey.shade400),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ID: ${p.nationalId}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(Icons.local_hospital_rounded,
-                          size: 12, color: Colors.grey.shade400),
-                      const SizedBox(width: 4),
-                      Text(
-                        p.clinicCode,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Worker-only badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: kP4.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kP4.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock_rounded, size: 10, color: kP4),
-                  const SizedBox(width: 3),
-                  Text(
-                    'WORKER',
-                    style: TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w800,
-                      color: kP4,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        const Divider(height: 1, thickness: 0.8),
-        const SizedBox(height: 12),
-        // Conditions
-        Text(
-          'Conditions',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey.shade500,
-            letterSpacing: 0.3,
+  // ── App bar ──────────────────────────────────────────────────────────────────
+  PreferredSizeWidget _buildAppBar(Patient p) {
+    return AppBar(
+      backgroundColor: kP2,
+      foregroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: false,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+        onPressed: () => context.pop(),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            p.fullName,
+            style: const TextStyle(
+                fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+          Text(
+            p.registrationCode,
+            style: const TextStyle(
+                fontSize: 11,
+                color: Colors.white70,
+                fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: _riskColor(p.riskLevel).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: _riskColor(p.riskLevel).withOpacity(0.5)),
+          ),
+          child: Text(
+            _riskLabel(p.riskLevel),
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: _riskColor(p.riskLevel)),
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: p.conditions
-              .map((c) => _conditionChip(c))
-              .toList(),
-        ),
       ],
-    ),
-  );
+      flexibleSpace: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+              colors: [kP2, kP3],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight),
+        ),
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(4),
+        child: Container(
+          height: 4,
+          decoration:
+              const BoxDecoration(gradient: LinearGradient(colors: [kP4, kP5])),
+        ),
+      ),
+    );
+  }
+
+  // ── Patient header card ──────────────────────────────────────────────────────
+  Widget _buildPatientHeader(Patient p, Color rc) {
+    final names = p.fullName.split(' ');
+    final initials = names.take(2).map((n) => n.isNotEmpty ? n[0] : '').join();
+    final conditions = (p.conditions ?? '').split(',').where((c) => c.trim().isNotEmpty).toList();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    initials.toUpperCase(),
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w800, color: kP2),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      p.fullName,
+                      style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1A1A2E)),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.badge_rounded,
+                            size: 12, color: Colors.grey.shade400),
+                        const SizedBox(width: 4),
+                        Text(
+                          p.registrationCode,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                    if ((p.clinicName ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.local_hospital_rounded,
+                              size: 12, color: Colors.grey.shade400),
+                          const SizedBox(width: 4),
+                          Text(
+                            p.clinicName!,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kP4.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kP4.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_rounded, size: 10, color: kP4),
+                    const SizedBox(width: 3),
+                    Text(
+                      'WORKER',
+                      style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: kP4,
+                          letterSpacing: 0.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (conditions.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(height: 1, thickness: 0.8),
+            const SizedBox(height: 12),
+            Text(
+              'Conditions',
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade500,
+                  letterSpacing: 0.3),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: conditions.map((c) => _conditionChip(c.trim())).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _conditionChip(String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -426,19 +429,17 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: kP3.withOpacity(0.25)),
     ),
-    child: Text(
-      label,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        color: kP2,
-      ),
-    ),
+    child: Text(label,
+        style: const TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w700, color: kP2)),
   );
 
   // ── Adherence summary ─────────────────────────────────────────────────────────
-  Widget _buildAdherenceSummary(_PatientData p) {
-    final ac = _adherenceColor(p.adherence30d);
+  Widget _buildAdherenceSummary(Patient p) {
+    final adherence = p.adherencePercentage30Days ?? 0.0;
+    final missed = p.missedDoses30Days ?? 0;
+    final ac = _adherenceColor(adherence);
+    final strip = _get14DayStrip();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -448,49 +449,39 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Section title
           _sectionTitle('Adherence Summary', Icons.insights_rounded),
           const SizedBox(height: 14),
-
-          // Big number row
           Row(
             children: [
-              // Adherence %
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${p.adherence30d.toStringAsFixed(0)}%',
+                      '${adherence.toStringAsFixed(0)}%',
                       style: TextStyle(
-                        fontSize: 42,
-                        fontWeight: FontWeight.w900,
-                        color: ac,
-                        height: 1,
-                      ),
+                          fontSize: 42,
+                          fontWeight: FontWeight.w900,
+                          color: ac,
+                          height: 1),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '30-day adherence rate',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
+                    Text('30-day adherence rate',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade500)),
                     const SizedBox(height: 8),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
                       child: LinearProgressIndicator(
-                        value: p.adherence30d / 100,
+                        value: (adherence / 100).clamp(0.0, 1.0),
                         minHeight: 8,
                         backgroundColor: Colors.grey.shade200,
                         valueColor: AlwaysStoppedAnimation(ac),
@@ -500,62 +491,53 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 ),
               ),
               const SizedBox(width: 20),
-              // Missed doses
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFB91C1C).withOpacity(0.07),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: const Color(0xFFB91C1C).withOpacity(0.2),
-                  ),
+                      color: const Color(0xFFB91C1C).withOpacity(0.2)),
                 ),
                 child: Column(
                   children: [
                     Text(
-                      '${p.missedDoses30d}',
+                      '$missed',
                       style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFB91C1C),
-                        height: 1,
-                      ),
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFB91C1C),
+                          height: 1),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'missed\ndoses',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade500,
-                        height: 1.3,
-                      ),
+                          fontSize: 10,
+                          color: Colors.grey.shade500,
+                          height: 1.3),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-
           const SizedBox(height: 18),
           const Divider(height: 1, thickness: 0.8),
           const SizedBox(height: 14),
-
-          // 14-day calendar strip
           Text(
             'Last 14 Days',
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey.shade500,
-              letterSpacing: 0.3,
-            ),
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.grey.shade500,
+                letterSpacing: 0.3),
           ),
           const SizedBox(height: 10),
-          _buildCalendarStrip(p.last14Days),
-
+          _buildCalendarStrip(strip),
           const SizedBox(height: 10),
-          // Legend
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -571,8 +553,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     );
   }
 
-  Widget _buildCalendarStrip(List<_AdherenceDay> days) {
-    final dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  Widget _buildCalendarStrip(List<({DateTime date, bool? taken})> days) {
+    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: days.map((d) {
@@ -585,21 +567,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           color = const Color(0xFFB91C1C);
         }
         final label = dayLabels[d.date.weekday - 1];
-        final isToday = d.date.day == DateTime.now().day;
+        final isToday = d.date.day == DateTime.now().day &&
+            d.date.month == DateTime.now().month;
 
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1.5),
             child: Column(
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade400)),
                 const SizedBox(height: 4),
                 Container(
                   height: 32,
@@ -612,15 +592,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                   ),
                   child: isToday
                       ? Center(
-                    child: Text(
-                      '${d.date.day}',
-                      style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  )
+                          child: Text(
+                            '${d.date.day}',
+                            style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
+                          ),
+                        )
                       : null,
                 ),
               ],
@@ -636,55 +615,93 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       Container(
         width: 10,
         height: 10,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+        decoration: BoxDecoration(
+            color: color, borderRadius: BorderRadius.circular(3)),
       ),
       const SizedBox(width: 4),
-      Text(
-        label,
-        style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-      ),
+      Text(label,
+          style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
     ],
   );
 
   // ── Medications section ───────────────────────────────────────────────────────
-  Widget _buildMedicationsSection(_PatientData p) => Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: kCard,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
+  Widget _buildMedicationsSection() {
+    if (_medications.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4)),
+          ],
         ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _sectionTitle('Medications', Icons.medication_rounded),
-        const SizedBox(height: 14),
-        ...p.medications.asMap().entries.map((e) {
-          final isLast = e.key == p.medications.length - 1;
-          return Column(
-            children: [
-              _buildMedCard(e.value),
-              if (!isLast) ...[
-                const SizedBox(height: 10),
-                const Divider(height: 1, thickness: 0.8),
-                const SizedBox(height: 10),
-              ],
-            ],
-          );
-        }),
-      ],
-    ),
-  );
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('Medications', Icons.medication_rounded),
+            const SizedBox(height: 14),
+            Center(
+              child: Text(
+                'No medications scheduled.',
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade400),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-  Widget _buildMedCard(_Medication med) {
-    final ac = _adherenceColor(med.adherence);
+    // Build reminder lookup by medicationId
+    final remindersByMed = <int, List<String>>{};
+    for (final r in _reminders) {
+      remindersByMed.putIfAbsent(r.medicationId, () => []).add(r.scheduledTime);
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Medications', Icons.medication_rounded),
+          const SizedBox(height: 14),
+          ..._medications.where((m) => m.isActive).toList().asMap().entries.map((e) {
+            final isLast = e.key == _medications.where((m) => m.isActive).length - 1;
+            final med = e.value;
+            final times = remindersByMed[med.id] ?? [];
+            return Column(
+              children: [
+                _buildMedCard(med, times),
+                if (!isLast) ...[
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, thickness: 0.8),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedCard(Medication med, List<String> times) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -705,160 +722,144 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               Text(
                 med.name,
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1A1A2E),
-                ),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1A2E)),
               ),
               const SizedBox(height: 2),
-              Text(
-                med.dosage,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-              ),
-              const SizedBox(height: 6),
-              // Times
-              Wrap(
-                spacing: 6,
-                children: med.times
-                    .map((t) => Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: kP2.withOpacity(0.07),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.access_time_rounded,
-                          size: 10, color: kP3),
-                      const SizedBox(width: 3),
-                      Text(
-                        t,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: kP3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ))
-                    .toList(),
-              ),
+              Text(med.dosage,
+                  style: TextStyle(
+                      fontSize: 11, color: Colors.grey.shade500)),
+              if (times.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  children: times
+                      .map((t) => Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: kP2.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.access_time_rounded,
+                            size: 10, color: kP3),
+                        const SizedBox(width: 3),
+                        Text(t,
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: kP3)),
+                      ],
+                    ),
+                  ))
+                      .toList(),
+                ),
+              ],
             ],
           ),
-        ),
-        const SizedBox(width: 10),
-        // Per-med adherence
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '${med.adherence.toStringAsFixed(0)}%',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-                color: ac,
-              ),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: 50,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: med.adherence / 100,
-                  minHeight: 5,
-                  backgroundColor: Colors.grey.shade200,
-                  valueColor: AlwaysStoppedAnimation(ac),
-                ),
-              ),
-            ),
-          ],
         ),
       ],
     );
   }
 
   // ── Risk explanation ──────────────────────────────────────────────────────────
-  Widget _buildRiskExplanation(_PatientData p, Color rc) => Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      color: kCard,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: rc.withOpacity(0.2)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: rc.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(Icons.info_outline_rounded, color: rc, size: 20),
-        ),
-        title: Text(
-          'Why this risk level?',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: kP2,
-          ),
-        ),
-        subtitle: Text(
-          _riskLabel(p.risk),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: rc,
-          ),
-        ),
-        trailing: Icon(
-          _riskExpanded
-              ? Icons.keyboard_arrow_up_rounded
-              : Icons.keyboard_arrow_down_rounded,
-          color: kP3,
-        ),
-        initiallyExpanded: _riskExpanded,
-        onExpansionChanged: (v) => setState(() => _riskExpanded = v),
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: rc.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: rc.withOpacity(0.15)),
-            ),
-            child: Text(
-              p.riskExplanation,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade700,
-                height: 1.6,
-              ),
-            ),
-          ),
+  Widget _buildRiskExplanation(Patient p, Color rc) {
+    final adherenceRate = (p.adherencePercentage30Days ?? 0) / 100;
+    final missed30 = p.missedDoses30Days ?? 0;
+    final total = (p.takenDoses30Days ?? 0) + missed30;
+    final score = p.riskScore ?? 0;
+
+    final reasons = <String>[];
+    if (adherenceRate < 0.5) {
+      reasons.add(
+          'Only ${adherenceRate * 100 ~/ 1}% of doses taken in the last 30 days');
+    } else if (adherenceRate < 0.8) {
+      reasons.add(
+          '${adherenceRate * 100 ~/ 1}% of doses taken — aim for above 80%');
+    }
+    if (missed30 > 0) reasons.add('$missed30 missed doses in the last 30 days');
+    if (total == 0) reasons.add('No dose history recorded yet');
+    if (reasons.isEmpty) {
+      reasons.add('${adherenceRate * 100 ~/ 1}% of doses taken in the last 30 days');
+    }
+
+    final riskExplanation = reasons.map((r) => '• $r').join('\n');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: rc.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
-    ),
-  );
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: rc.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child:
+                Icon(Icons.info_outline_rounded, color: rc, size: 20),
+          ),
+          title: Text(
+            'Why this risk level?',
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w800, color: kP2),
+          ),
+          subtitle: Text(
+            '${_riskLabel(p.riskLevel)} — Score: $score/100',
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700, color: rc),
+          ),
+          trailing: Icon(
+            _riskExpanded
+                ? Icons.keyboard_arrow_up_rounded
+                : Icons.keyboard_arrow_down_rounded,
+            color: kP3,
+          ),
+          initiallyExpanded: _riskExpanded,
+          onExpansionChanged: (v) => setState(() => _riskExpanded = v),
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: rc.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: rc.withOpacity(0.15)),
+              ),
+              child: Text(
+                riskExplanation,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    height: 1.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // ── Actions section ───────────────────────────────────────────────────────────
-  Widget _buildActions(BuildContext context, _PatientData p) => Container(
+  Widget _buildActions(BuildContext context) => Container(
     margin: const EdgeInsets.symmetric(horizontal: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -866,10 +867,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4)),
       ],
     ),
     child: Column(
@@ -882,8 +882,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           label: 'Schedule Follow-up',
           color: kP3,
           onTap: () => context.push(
-            '/worker/patients/${widget.patientId}/follow-up',
-          ),
+              '/worker/patients/${widget.patientId}/follow-up'),
         ),
         const SizedBox(height: 10),
         _actionButton(
@@ -898,8 +897,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           label: 'Edit Medication Schedule',
           color: const Color(0xFF6D28D9),
           onTap: () => context.push(
-            '/worker/patients/${widget.patientId}/schedule',
-          ),
+              '/worker/patients/${widget.patientId}/schedule'),
         ),
         const SizedBox(height: 10),
         _actionButton(
@@ -925,39 +923,35 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
           side: BorderSide(color: color.withOpacity(0.6), width: 1.5),
-          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+          padding:
+              const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
           alignment: Alignment.centerLeft,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+              borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
+              fontSize: 13, fontWeight: FontWeight.w700),
           minimumSize: const Size(double.infinity, 48),
         ),
       );
 
   void _showSmsDialog(BuildContext context) {
+    final name = _patient?.fullName.split(' ').first ?? 'Patient';
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Send SMS Reminder',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: kP2,
-          ),
-        ),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Send SMS Reminder',
+            style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w800, color: kP2)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Send a medication reminder SMS to ${_patient.firstName}?',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              'Send a medication reminder SMS to $name?',
+              style: TextStyle(
+                  fontSize: 13, color: Colors.grey.shade700),
             ),
             const SizedBox(height: 16),
             Container(
@@ -968,13 +962,12 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 border: Border.all(color: kP4.withOpacity(0.2)),
               ),
               child: Text(
-                '"Hi ${_patient.firstName}, this is a reminder to take your medication today. Please contact your clinic if you have any questions."',
+                '"Hi $name, this is a reminder to take your medication today. Please contact your clinic if you have any questions."',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                  fontStyle: FontStyle.italic,
-                  height: 1.5,
-                ),
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontStyle: FontStyle.italic,
+                    height: 1.5),
               ),
             ),
           ],
@@ -982,20 +975,19 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: TextStyle(color: Colors.grey.shade500)),
+            child: Text('Cancel',
+                style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('SMS sent to ${_patient.firstName}'),
-                  backgroundColor: const Color(0xFF16A34A),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('SMS sent to $name'),
+                backgroundColor: const Color(0xFF16A34A),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kP4,
@@ -1012,7 +1004,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   // ── Follow-up log ─────────────────────────────────────────────────────────────
-  Widget _buildFollowUpLog(_PatientData p) => Container(
+  Widget _buildFollowUpLog() => Container(
     margin: const EdgeInsets.symmetric(horizontal: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -1020,10 +1012,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
-        ),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4)),
       ],
     ),
     child: Column(
@@ -1031,107 +1022,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       children: [
         _sectionTitle('Follow-up Log', Icons.history_rounded),
         const SizedBox(height: 14),
-        if (p.followUpLog.isEmpty)
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text(
-                'No follow-up notes yet.',
-                style: TextStyle(
-                    fontSize: 13, color: Colors.grey.shade400),
-              ),
-            ),
-          )
-        else
-          ...p.followUpLog.asMap().entries.map((e) {
-            final isLast = e.key == p.followUpLog.length - 1;
-            return _buildFollowUpEntry(e.value, isLast: isLast);
-          }),
-      ],
-    ),
-  );
-
-  Widget _buildFollowUpEntry(_FollowUpNote note, {required bool isLast}) => IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Timeline line
-        SizedBox(
-          width: 20,
-          child: Column(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                margin: const EdgeInsets.only(top: 4),
-                decoration: BoxDecoration(
-                  color: kP4,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(color: kP4.withOpacity(0.3), blurRadius: 4),
-                  ],
-                ),
-              ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    color: kP4.withOpacity(0.2),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        // Note content
-        Expanded(
+        Center(
           child: Padding(
-            padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      note.date,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: kP2,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      note.worker,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.grey.shade400,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: kBg,
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                    Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Text(
-                    note.note,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                    ),
-                  ),
-                ),
-              ],
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Text(
+              'No follow-up notes yet.',
+              style: TextStyle(
+                  fontSize: 13, color: Colors.grey.shade400),
             ),
           ),
         ),
@@ -1152,14 +1049,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         child: Icon(icon, size: 16, color: kP3),
       ),
       const SizedBox(width: 10),
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
-          color: kP2,
-        ),
-      ),
+      Text(label,
+          style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: kP2)),
     ],
   );
 }

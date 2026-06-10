@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../providers/session_provider.dart';
 import '../data/patient_mgmt_repository.dart';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
@@ -157,10 +158,12 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         )
         .toList();
 
+    final clinicName = context.read<SessionProvider>().workerClinicName;
     final result = await context.read<PatientMgmtRepository>().registerPatient(
           fullName: _fullNameCtrl.text.trim(),
           clinicCode: _patientCodeCtrl.text.trim(),
           conditions: _selectedConditions.join(','),
+          clinicName: clinicName,
           caregiverPhone: _caregiverPhoneCtrl.text.trim().isEmpty
               ? null
               : _caregiverPhoneCtrl.text.trim(),
