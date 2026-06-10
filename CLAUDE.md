@@ -45,7 +45,7 @@ flutter build web       # Web
 The app serves two distinct user types whose routes never overlap:
 
 - **Patients** — `/patient/*` routes. Home screen, medication detail, adherence calendar, risk level, reminder settings.
-- **Healthcare Workers** — `/worker/*` routes. Dashboard, patient list, patient detail, medication schedule, follow-up.
+- **Healthcare Workers** — `/worker/*` routes. Dashboard, patient list, patient detail, medication schedule, follow-up, reports.
 - **Shared** — Auth flow (`/`, `/login`, `/pin-setup`, `/registration-code`) and caregiver linking (`/caregiver/link`).
 
 All routes are declared statically in `lib/app/router.dart` as `AppRoutes` constants and assembled in `AppRouter.routes`. Navigation uses `GoRouter` with named routes — always navigate by name to avoid hardcoding path strings.
@@ -74,34 +74,51 @@ Key conventions:
 
 ### State management
 
-`Provider` is used for global state. Currently only `LocaleProvider` (in `lib/providers/locale_provider.dart`) is in the widget tree — it drives the app locale and is injected at the root in `main.dart`. The `AppDatabase` instance is not yet in the Provider tree (the TODO in `main.dart` marks this as pending).
+`Provider` is the state management solution. All global objects are injected in `main.dart` via `MultiProvider` before `runApp`. The full Provider tree includes:
+
+- `AppDatabase` — single SQLite instance
+- `ConnectivityService` — network connectivity stream
+- `SyncService` — offline sync engine
+- `RiskEngine` — risk score calculator
+- `PatientRepository` — patient + medication CRUD
+- `AdherenceRepository` — dose logging + risk recalculation
+- `DashboardRepository` — clinic-wide aggregates
+- `AuthRepository` — activation code validation and PIN persistence
+- `PatientMgmtRepository` — patient registration and schedule management
+- `SessionProvider` (ChangeNotifier) — current patient ID and role
+- `LocaleProvider` (ChangeNotifier) — app locale (drives language switching)
+
+Screens access these via `context.read<T>()` (one-off reads) or `context.watch<T>()` (rebuilds on change).
 
 ### Localization
 
 Supported locales: English (`en`), Zulu (`zu`), Xhosa (`xh`). ARB source files live in `lib/l10n/`. After editing ARBs, run `flutter gen-l10n` — this regenerates `lib/generated/` and `lib/l10n/app_localizations*.dart`. Use `AppLocalizations.of(context)!` to access strings in widgets.
 
-### Core services (partially implemented)
+### Core services
 
-Several core services exist as stubs or are not yet wired into the app:
+- `core/security/auth_service.dart` — **implemented**. PIN hashing (SHA-256), `saveSession` / `loadSession` / `clearSession` using a JSON file in the app documents directory.
+- `core/network/connectivity_service.dart` — **implemented**. Streams connectivity changes via `connectivity_plus`. `main.dart` listens and calls `SyncService.sync()` each time the device goes from offline → online.
+- `core/sync/sync_service.dart` — partially implemented. Push/pull protocol with Firestore is in progress; wired in `main.dart`.
+- `core/notifications/notification_service.dart` — stub. Timezone helper exists; notification scheduling not yet wired.
+- `core/sms/sms_fallback_service.dart` — stub.
+- `core/network/api_client.dart` — stub.
+- `core/security/encryption_service.dart` — stub.
 
-- `core/sync/sync_service.dart` — offline sync engine (stub).
-- `core/security/auth_service.dart` / `encryption_service.dart` — PIN auth and encryption (stubs).
-- `core/notifications/notification_service.dart` — local push notifications with timezone support (stub).
-- `core/sms/sms_fallback_service.dart` — SMS reminders for offline patients (stub).
-- `core/network/api_client.dart` — backend HTTP client (stub).
+### Session state
 
-The `main.dart` TODOs mark where these should be initialized before `runApp`.
+`SessionProvider` (`lib/providers/session_provider.dart`) holds the current patient ID and role. At startup, `main.dart` calls `AuthService.loadSession()` to restore a persisted session from disk, validating that the patient still exists in the local DB before restoring. Screens read `context.watch<SessionProvider>().currentPatientId` to scope queries.
+
+On login, call `AuthService.saveSession(patientId)` to persist the session. On logout, call `AuthService.clearSession()` and reset the `SessionProvider`.
 
 ### Firebase + offline sync
 
-Firebase is gated behind `kFirebaseConfigured` in `lib/core/utils/constants.dart` (currently `false`). To enable:
+Firebase is enabled — `kFirebaseConfigured = true` in `lib/core/utils/constants.dart`. `firebase_options.dart` contains the active configuration.
+
+To reconfigure for a different Firebase project:
 1. Run `dart pub global activate flutterfire_cli && flutterfire configure`
 2. Replace `lib/firebase_options.dart` with the generated file
-3. Set `kFirebaseConfigured = true` in `constants.dart`
 
-`SyncService` (`lib/core/sync/sync_service.dart`) pushes all rows with `isSynced=false` to Firestore, then pulls documents updated after the last sync timestamp (persisted to `getApplicationDocumentsDirectory()/last_sync.json`). Conflict resolution is last-write-wins via `ConflictResolver` — a dirty local row (unsent) always beats the remote version.
-
-`ConnectivityService` streams connectivity changes; `main.dart` subscribes and calls `SyncService.sync()` each time the device goes from offline → online.
+`SyncService` pushes all rows with `isSynced=false` to Firestore, then pulls documents updated after the last sync timestamp (persisted to `getApplicationDocumentsDirectory()/last_sync.json`). Conflict resolution is last-write-wins via `ConflictResolver` — a dirty local row (unsent) always beats the remote version.
 
 ### Risk engine
 
@@ -112,17 +129,16 @@ Firebase is gated behind `kFirebaseConfigured` in `lib/core/utils/constants.dart
 
 `RiskResult` (`lib/features/risk_assessment/domain/risk_model.dart`) carries a 0–100 numeric score, adherence rate, streak, and human-readable `reasons`/`recommendation` strings consumed by `RiskLevelScreen`.
 
-### Session state
-
-`SessionProvider` (`lib/providers/session_provider.dart`) holds the current patient ID and role. Set via `signInAsPatient(id)` from the auth flow. Screens read `context.watch<SessionProvider>().currentPatientId` to scope queries.
-
 ### Repository layer
 
-Three repositories wrap the DAOs for screens:
+Repositories wrap the DAOs and are the only layer screens should call:
 - `PatientRepository` — patient + medication CRUD
 - `AdherenceRepository` — dose logging; always re-runs `RiskEngine.calculate()` after a status change and returns the updated `RiskResult`
 - `DashboardRepository` — clinic-wide aggregates for the worker dashboard
+- `PatientMgmtRepository` — patient registration, medication schedule management
+- `AuthRepository` — activation code lookup and PIN storage
+- `CaregiverRepository` — caregiver account linking
 
 ### PDF reports
 
-`lib/core/utils/report_generator.dart` and `lib/features/reports/` handle PDF generation using the `pdf` package and sharing via `share_plus`.
+`lib/core/utils/report_generator.dart` and `lib/features/reports/` handle PDF generation using the `pdf` package and sharing via `share_plus`. The report screen supports both per-patient and clinic-wide modes, and exports in PDF or CSV format.

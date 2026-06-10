@@ -1,59 +1,40 @@
 ## MedAdhere Project Report
 
-A comprehensive 7-page PDF report has been generated with all requested sections.
+A comprehensive 8-page PDF report covering the full project.
 
 ### Report Location
-The report will be saved in the **project root directory** (same location as this guide):
-`MedAdhere_Project_Report_May2026.pdf`
 
-**Windows:** `c:\Users\HP\Desktop\ProgrammingProject\med_adhere\MedAdhere_Project_Report_May2026.pdf`
-
-(On other platforms: Your app's documents directory)
+The generated report is saved in the project root directory:
+```
+MedAdhere_Project_Report_May2026.pdf
+```
 
 ### How to Generate the Report
 
-#### Option 1: Quick Command Line (Fastest)
-#### Option 2: From Flutter App
-Run this command in the project root directory:
+#### Option 1: Command Line (Fastest)
+
+Run this from the project root:
 
 ```bash
-dart pub get
 dart run tool/generate_report.dart
 ```
 
-The PDF will be created instantly in the project root as `MedAdhere_Project_Report_May2026.pdf`
-Add this method to your app and call it from any screen:
+The PDF will be created in the project root as `MedAdhere_Project_Report_May2026.pdf`.
+
+#### Option 2: From the Flutter App
 
 ```dart
 import 'package:mzansi_meds_reminder/core/utils/report_generator.dart';
 
-// Call from your app
+// Generate the report
 final reportFile = await ReportGenerator.generateProjectReport();
-print('Repor3 saved to: ${reportFile.path}');
+print('Report saved to: ${reportFile.path}');
 
-// To share the report:
+// Share it
 await Share.shareXFiles(
   [XFile(reportFile.path)],
   subject: 'MedAdhere Project Report',
 );
-```
-
-#### Option 2: From Main Function
-Add temporary code to `lib/main.dart`:
-
-```dart
-import 'package:mzansi_meds_reminder/core/utils/report_generator.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Generate report
-  final reportFile = await ReportGenerator.generateProjectReport();
-  print('Report generated: ${reportFile.path}');
-  
-  // Then proceed with app
-  runApp(const MedAdhereApp());
-}
 ```
 
 ### Report Contents
@@ -68,15 +49,15 @@ Future<void> main() async {
 - Target users: Patients, healthcare workers, caregivers
 
 **Page 3: Implemented Features**
-- Patient features (home, tracking, calendar, risk assessment)
-- Healthcare worker features (dashboard, patient list, risk monitoring)
-- Authentication & security flows (language selection, PIN setup)
+- Patient features (home, tracking, calendar, risk assessment, reminders)
+- Healthcare worker features (dashboard, patient management, reports)
+- Authentication & security flows (language selection, PIN setup, session persistence)
 - Cross-platform support details
 
-**Page 4: Pending Features for M5 (with priorities & timeline)**
-- Priority 1 (Critical): Database, sync, notifications (Week 1-2)
-- Priority 2 (Important): Patient management, reports, encryption (Week 3-4)
-- Priority 3 (Enhancement): Advanced risk assessment, follow-up scheduling (Week 5+)
+**Page 4: Pending Features (with priorities & timeline)**
+- Priority 1 (Critical): Notification scheduling, sync protocol, encryption
+- Priority 2 (Important): SMS fallback, advanced report analytics
+- Priority 3 (Enhancement): Caregiver portal, performance optimizations
 
 **Page 5: System Design Overview**
 - Clean architecture with feature-driven modularization
@@ -91,47 +72,29 @@ Future<void> main() async {
 - Code quality metrics
 - Performance assessment results
 - Current implementation status
-- Key improvements achieved
 
 **Page 7: Known Limitations & Risks**
-- 6 known limitations with status and mitigation plans
-- Risk assessment (4 identified risks)
-- Likelihood and impact analysis
-- Mitigation strategies for each risk
+- Known limitations with status and mitigation plans
+- Risk assessment with likelihood and impact analysis
+- Mitigation strategies
 
 **Page 8: References & Tech Stack**
 - All libraries and packages used
 - Development tools
-- Planned dependencies for M5
 - External resources and documentation
-- Project information summary
 
 ### File Structure
+
+```
 tool/
-└── generate_report.dart  (NEW - Standalone report generator)
+└── generate_report.dart       # Standalone CLI report generator
 
 lib/core/utils/
-└── report_generator.dart  (Report generator for Flutter app
-└── report_generator.dart  (NEW - Report generator utility)
+└── report_generator.dart      # Report generator for use inside the Flutter app
 ```
 
-### Dependencies Already Available
-- `pdf` (v3.10.8) - For PDF generation
-- `path_provider` (v2.1.3) - For file system access
-- `share_plus` (v9.0.0) - For sharing the PDF
+### Dependencies
 
-### Notes
-- The report is automatically formatted for A4 paper size
-- Uses professional color scheme (blue accents, readable fonts)
-- All 8 required sections are included with detailed content
-- Timeline information provided for M5 features
-- Risk assessment with mitigation strategies included
-
-###**Quickest way:** Open terminal in project root and run:
-   ```bash
-   dart pub get
-   dart run tool/generate_report.dart
-   ```
-2. The PDF will appear in the same folder as `REPORT_GUIDE.md`ve
-2. The PDF will be saved to your app's documents directory
-3. Share the report via email, messaging, or cloud storage as needed
+- `pdf` — PDF generation
+- `path_provider` — File system access
+- `share_plus` — Sharing the exported PDF

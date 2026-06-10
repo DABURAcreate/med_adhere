@@ -1,6 +1,6 @@
 # Mzansi Meds Reminder
 
-A cross-platform Flutter application designed to improve medication adherence tracking for patients and healthcare workers in Southern Africa. The app supports multi-language interfaces (English, Zulu, Xhosa) and works offline with automatic data synchronization.
+A cross-platform Flutter application designed to improve medication adherence tracking for patients and healthcare workers in Southern Africa. The app supports multi-language interfaces (English, Zulu, Xhosa) and works offline with automatic Firebase synchronization.
 
 ## Features
 
@@ -9,26 +9,30 @@ A cross-platform Flutter application designed to improve medication adherence tr
 - **Medication Tracking** — Log medication intake with detailed dose information
 - **Adherence Calendar** — Visual calendar view of medication adherence history
 - **Risk Assessment** — Real-time risk level monitoring with visual indicators
+- **Reminder Settings** — Customise reminder times and frequency per medication
 - **Language Support** — Choose between English, Zulu, or Xhosa interfaces
 
 ### Healthcare Worker Features (✅ Implemented)
 - **Worker Dashboard** — Overview of clinic statistics and patient metrics
 - **Patient List** — Browse clinic patients with risk indicators
 - **Risk Overview** — Monitor patient risk levels with visual charts
+- **Patient Registration** — Register new patients with medication schedules
+- **Patient Detail** — View individual patient adherence history
+- **Medication Schedule** — Assign and manage medication schedules
+- **Follow-up Scheduling** — Schedule and record patient follow-ups
+- **Adherence Reports** — Export per-patient and clinic-wide reports as PDF/CSV
 
-### Additional Features (🔄 In Development)
-- **Medication Reminders** — Notifications for scheduled medications (with SMS fallback)
-- **Offline Support** — Full functionality without internet connectivity
-- **Data Sync** — Automatic sync when connectivity is restored
-- **Patient Management** — Register and manage patient information
-- **Follow-up Scheduling** — Schedule patient follow-ups
-- **Adherence Reports** — Export adherence reports as PDF
+### Security Features (✅ Implemented)
+- **PIN Authentication** — SHA-256 hashed PIN setup and login
+- **Session Persistence** — Authenticated session survives app restarts
+- **Local Database** — SQLite storage via Drift ORM
 
-### Security Features (🔄 In Development)
-- **PIN Authentication** — Secure patient access with PIN setup
-- **Encryption** — End-to-end encryption for sensitive data
-- **Local Database** — Encrypted SQLite storage
-- **Caregiver Linking** — Link caregiver accounts for support
+### In Development (🔄)
+- **Offline Sync** — Full offline-first sync with Firestore (service wired, protocol in progress)
+- **Push Notifications** — Local medication reminders with timezone support
+- **SMS Fallback** — SMS reminders for patients without smartphones
+- **Encryption** — End-to-end encryption for data at rest and in transit
+- **Caregiver Linking** — Link caregiver accounts for patient support
 
 ## Screens Implemented
 
@@ -36,68 +40,73 @@ A cross-platform Flutter application designed to improve medication adherence tr
 - **Language Screen** — Initial language selection (EN, ZU, XH)
 - **Login Screen** — PIN-based login for existing users
 - **PIN Setup Screen** — New user PIN configuration
-- **Registration Code Screen** — Code verification for new accounts
+- **Registration Code Screen** — Activation code verification for new accounts
 
 ### Patient Interface
 - **Home Screen** — Dashboard showing upcoming medications
 - **Medication Detail Screen** — Detailed view of specific medications
 - **Adherence Calendar** — Month-view calendar of adherence history
-- **Risk Level Screen** — Visual risk assessment display
+- **Risk Level Screen** — Visual risk assessment display with score and recommendations
+- **Reminder Settings Screen** — Per-medication reminder time configuration
 
 ### Healthcare Worker Interface
 - **Dashboard Screen** — Clinic overview with statistics and charts
 - **Patient List Screen** — Browsable list of clinic patients
-- **Risk Overview Card** — Quick-view risk indicators
-- **Clinic Stats Chart** — Visual representation of clinic metrics
+- **Register Patient Screen** — Form to register a new patient with medications
+- **Patient Detail Screen** — Individual patient profile and adherence history
+- **Medication Schedule Screen** — View and manage a patient's medication schedule
+- **Follow-up Screen** — Schedule and record patient follow-up appointments
+- **Reports Screen** — Export adherence reports (per-patient or clinic-wide)
 
 ### Account Management
 - **Caregiver Link Screen** — Link secondary caregiver accounts
 
 ## Tech Stack
 
-- **Framework** — Flutter 3.9.2+
-- **State Management** — Provider (with multi-language support)
-- **Database** — SQLite with drift ORM
+- **Framework** — Flutter (Dart SDK ^3.9.2)
+- **State Management** — Provider
+- **Database** — SQLite with Drift ORM
+- **Cloud Sync** — Firebase Firestore
 - **Routing** — GoRouter
-- **Networking** — HTTP client with offline-first architecture
-- **Notifications** — Local notifications with timezone support
-- **Localization** — intl (English, Zulu, Xhosa)
-- **Export** — PDF generation
+- **Notifications** — Local notifications with timezone support (stub)
+- **Localization** — flutter_localizations + intl (English, Zulu, Xhosa)
+- **Export** — PDF generation via `pdf` package, sharing via `share_plus`
+- **Security** — `crypto` (SHA-256 PIN hashing)
 
 ## Project Structure
 
 ```
 lib/
 ├── app/                          # App configuration
-│   ├── app.dart                 # Main app widget
-│   ├── router.dart              # Navigation routes
-│   └── theme.dart               # App theming
+│   ├── app.dart                 # Root widget + GoRouter setup
+│   ├── router.dart              # All named routes (AppRoutes + AppRouter)
+│   └── theme.dart               # Light/dark themes
 ├── core/                         # Core services
-│   ├── database/                # SQLite database, DAOs, tables
-│   ├── network/                 # API client, connectivity
-│   ├── notifications/           # Local notifications, timezone
-│   ├── security/                # Authentication, encryption
-│   ├── sync/                    # Data synchronization
+│   ├── database/                # AppDatabase, DAOs, table definitions
+│   ├── network/                 # API client, ConnectivityService
+│   ├── notifications/           # Local notifications, timezone helper
+│   ├── security/                # AuthService (PIN + session), EncryptionService
+│   ├── sync/                    # SyncService, ConflictResolver
 │   ├── sms/                     # SMS fallback service
-│   └── utils/                   # Constants, helpers
+│   └── utils/                   # Constants, date utils, report generator
 ├── features/                     # Feature modules (domain-driven)
 │   ├── auth/                    # Login, registration, PIN setup
-│   ├── patient/                 # Patient home, medication, calendar
-│   ├── dashboard/               # Worker dashboard, stats
-│   ├── patient_management/      # Register, schedule, follow-up
+│   ├── patient/                 # Patient home, medication, calendar, risk
+│   ├── dashboard/               # Worker dashboard, patient list, stats
+│   ├── patient_management/      # Register, schedule, follow-up, patient detail
 │   ├── caregiver/               # Caregiver linking
 │   ├── reminders/               # Reminder settings
-│   ├── reports/                 # Adherence reports
+│   ├── reports/                 # Adherence report export
 │   └── risk_assessment/         # Risk calculation engine
+├── providers/                    # Global state (SessionProvider, LocaleProvider)
 ├── generated/                    # Auto-generated localization files
-└── main.dart                     # Entry point
+└── main.dart                     # Entry point — DI setup, session restore, sync wiring
 ```
 
 ## Getting Started
 
 ### Prerequisites
-- Flutter 3.9.2 or higher
-- Dart 3.9.2 or higher
+- Flutter SDK (Dart ^3.9.2 required)
 - Xcode 15+ (for iOS)
 - Android SDK 21+ (for Android)
 
@@ -114,154 +123,128 @@ lib/
    flutter pub get
    ```
 
-3. **Generate localization files**
+3. **Generate Drift ORM code**
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+4. **Generate localization files**
    ```bash
    flutter gen-l10n
    ```
 
-4. **Run the app**
+5. **Run the app**
    ```bash
    flutter run
    ```
 
 ### Building for Specific Platforms
 
-**iOS:**
 ```bash
-flutter build ios
-```
-
-**Android:**
-```bash
-flutter build apk
-```
-
-**Web:**
-```bash
-flutter build web
-```
-
-**macOS:**
-```bash
-flutter build macos
-```
-
-**Windows:**
-```bash
-flutter build windows
-```
-
-**Linux:**
-```bash
-flutter build linux
+flutter build apk       # Android
+flutter build ios       # iOS
+flutter build web       # Web
+flutter build macos     # macOS
+flutter build windows   # Windows
+flutter build linux     # Linux
 ```
 
 ## Key Modules
 
 ### Authentication (`features/auth/`)
-- Language selection
-- PIN-based authentication
-- Registration code verification
-- Login flow
+- Language selection on first launch
+- Activation code verification for new accounts
+- PIN setup with SHA-256 hashing stored in the local database
+- PIN login with session persistence across restarts
 
 ### Patient Module (`features/patient/`)
-- Home dashboard with upcoming medications
-- Medication details and scheduling
-- Adherence calendar with historical data
-- Risk level visualization
-- Dose tracking widgets
+- Home dashboard with upcoming dose cards
+- Medication details and dose logging (`taken`, `missed`, `skipped`, `late`)
+- Adherence calendar with historical status view
+- Risk level screen with score, reasons, and recommended actions
+- Reminder settings with per-medication time pickers
 
 ### Dashboard (`features/dashboard/`)
 - Clinic-wide statistics and charts
-- Patient list with risk indicators
+- Patient list with risk-level badges
 - Risk overview cards
-- Bottom navigation for multi-screen navigation
 
-### Data Management
-- **Patients DAO** — Patient records and profiles
-- **Medications DAO** — Medication inventory
-- **Reminders DAO** — Reminder scheduling
-- **Adherence Logs DAO** — Dose tracking history
+### Patient Management (`features/patient_management/`)
+- Register new patients with demographic info and initial medications
+- View and edit medication schedules
+- Record and view follow-up appointments
+
+### Reports (`features/reports/`)
+- Per-patient and clinic-wide adherence reports
+- PDF and CSV export with sharing support
+
+### Data Layer
+- **PatientsDao** — Patient records and profiles
+- **MedicationsDao** — Medication inventory and schedules
+- **RemindersDao** — Reminder configuration per medication
+- **AdherenceLogsDao** — Dose intake history with idempotent insert
+
+### Repositories
+- `PatientRepository` — patient + medication CRUD
+- `AdherenceRepository` — dose logging; re-runs RiskEngine after every status change
+- `DashboardRepository` — clinic-wide aggregates
+- `PatientMgmtRepository` — registration and schedule management
+- `AuthRepository` — activation code validation and PIN persistence
+- `CaregiverRepository` — caregiver account linking
 
 ### Sync Engine (`core/sync/`)
-- Offline-first architecture
-- Automatic conflict resolution
-- Data consistency maintenance
+- `SyncService` — pushes `isSynced=false` rows to Firestore, pulls remote updates
+- `ConnectivityService` — triggers a sync whenever the device comes back online
+- `ConflictResolver` — last-write-wins; dirty local rows always beat remote versions
 
 ## Database Schema
 
-### Tables
-- **patients** — Patient profiles, demographics
-- **medications** — Available medications
-- **reminders** — Medication reminders and schedules
-- **adherence_logs** — Dose intake records
+| Table | Purpose |
+|---|---|
+| `patients` | Patient profiles and demographics |
+| `medications` | Medication records and active status |
+| `reminders` | Per-medication reminder times |
+| `adherence_logs` | Dose intake records with unique constraint `(patientId, medicationId, scheduledAt)` |
+
+Dates are stored as ISO 8601 strings (`yyyy-MM-dd`); timestamps as `DateTime` (Drift handles encoding). Foreign key cascades are enabled — deleting a patient removes all related rows.
+
+## Firebase / Offline Sync
+
+Firebase is active (`kFirebaseConfigured = true` in `lib/core/utils/constants.dart`). To reconfigure for a different Firebase project:
+1. Run `dart pub global activate flutterfire_cli && flutterfire configure`
+2. Replace `lib/firebase_options.dart` with the newly generated file
 
 ## Localization
 
-Supported languages:
-- English
-- Zulu (zu)
-- Xhosa (xh)
-
-Add new languages by updating `l10n.yaml` and adding message files.
-
-## API Integration
-
-The app communicates with a backend API for:
-- User authentication
-- Clinic data synchronization
-- Patient records
-- Reports submission
-
-See `core/network/api_client.dart` for endpoint configuration.
-
-## Notifications
-
-- **Local Notifications** — Device-based medication reminders
-- **SMS Fallback** — SMS reminders for offline patients
-- **Timezone Support** — Correct scheduling across timezones
+Supported locales: English (`en`), Zulu (`zu`), Xhosa (`xh`). ARB source files live in `lib/l10n/`. After editing ARBs:
+```bash
+flutter gen-l10n
+```
 
 ## Development
 
-### Code Standards
-- Follow Dart style guide
-- Use meaningful variable names
-- Add comments for complex logic
-- Keep functions focused and testable
-
-### Testing
+### Code Generation
+After any change to a Drift table or DAO:
 ```bash
-flutter test
+dart run build_runner build --delete-conflicting-outputs
 ```
 
-### Linting
+### Testing & Linting
 ```bash
+flutter test
 flutter analyze
 ```
 
-## Troubleshooting
+### Troubleshooting
 
-**Dependency issues:**
+**Clean build:**
 ```bash
-flutter clean
-flutter pub get
+flutter clean && flutter pub get
 ```
 
-**Build cache problems:**
+**iOS pod issues:**
 ```bash
-flutter clean
-flutter pub cache clean
-flutter pub get
-flutter run
-```
-
-**iOS specific issues:**
-```bash
-cd ios
-rm -rf Podfile.lock
-pod install
-cd ..
-flutter run
+cd ios && rm -rf Podfile.lock && pod install && cd ..
 ```
 
 ## Contributing
@@ -269,50 +252,52 @@ flutter run
 1. Create a feature branch
 2. Commit changes with clear messages
 3. Push and create a pull request
-4. Ensure tests pass and code is analyzed
+4. Ensure `flutter analyze` passes and tests are green
 
 ## License
 
 This project is proprietary and confidential.
 
-## Support
-
-For issues and questions, contact the development team.
-
 ## Implementation Status
 
-### ✅ Completed Features
-- **Authentication Flow** — Language selection, login, PIN setup, registration code verification
-- **Patient Dashboard** — Home screen with upcoming medications
-- **Medication Tracking** — Medication details screen with dose information
-- **Adherence Calendar** — Full calendar view showing adherence history
-- **Risk Assessment** — Risk level visualization and calculation
-- **Healthcare Worker Dashboard** — Clinic stats, patient list, risk overview cards
-- **Caregiver Linking** — Caregiver link screen for account management
-- **UI Components** — Bottom navigation, app bar, continue button, PIN input, badges
+### ✅ Completed
+- Authentication flow — language selection, activation code, PIN setup and login
+- Session persistence — authenticated session survives app restarts
+- Patient dashboard — home screen with upcoming dose cards
+- Medication tracking — detail screen with dose logging
+- Adherence calendar — full month-view with status history
+- Risk assessment — risk engine with score, thresholds, and recommendations
+- Healthcare worker dashboard — clinic stats, patient list, risk overview
+- Patient management — register patient, medication schedule, follow-up, patient detail
+- Reminder settings — per-medication time picker UI
+- Reports — PDF/CSV export screen with per-patient and clinic-wide modes
+- Caregiver linking — caregiver link screen
+- Firebase integration — Firestore connectivity enabled
+- Offline sync wiring — ConnectivityService triggers SyncService on reconnect
 
 ### 🔄 In Progress
-- Dashboard patient list refinements
-- Patient management (register, schedule, follow-up)
-- Reminder settings and notifications
-- Reports and PDF export
-- Offline sync engine
+- SyncService Firestore protocol (push/pull logic)
+- Local push notifications (service stub exists)
+- Reminder settings database persistence (UI complete, DAO write pending)
 
 ### 📋 Planned
 - SMS fallback notifications
-- Advanced risk engine
-- Report analytics
+- End-to-end encryption
+- Advanced report analytics
 - Performance optimizations
 
 ## Changelog
 
 ### v1.0.0 (Current Development)
-- ✅ Authentication system with multi-language support
-- ✅ Patient medication tracking interface
-- ✅ Adherence calendar view
-- ✅ Healthcare worker dashboard with statistics
-- ✅ Risk assessment visualization
-- ✅ Caregiver account linking
-- ✅ Bottom navigation and app scaffolding
-- 🔄 Offline support with sync (in progress)
-- 🔄 Patient management workflows (in progress)
+- Authentication system with multi-language support
+- Patient medication tracking and dose logging
+- Adherence calendar view
+- Healthcare worker dashboard with statistics
+- Risk assessment engine and visualization
+- Patient management (register, schedule, follow-up)
+- Reminder settings UI
+- Adherence report export (PDF/CSV)
+- Caregiver account linking
+- Firebase integration enabled
+- Session persistence across restarts
+- Connectivity-triggered sync
