@@ -4,7 +4,10 @@ import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/router.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../../providers/session_provider.dart';
+import '../../patient/data/adherence_repository.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
 import '../widgets/continue_button.dart';
@@ -45,7 +48,19 @@ class _LoginScreenState extends State<LoginScreen> {
           );
           context.go(AppRoutes.dashboard);
         } else {
-          context.read<SessionProvider>().signInAsPatient(int.parse(userId));
+          final patientId = int.parse(userId);
+          context.read<SessionProvider>().signInAsPatient(patientId);
+          // Auto-mark any past doses that were never logged, then
+          // reschedule notifications for the freshly signed-in patient.
+          final db = context.read<AppDatabase>();
+          final adherenceRepo = context.read<AdherenceRepository>();
+          if (mounted) {
+            adherenceRepo.autoMarkPastDoses(patientId);
+            NotificationService.scheduleAllForPatient(
+              db: db,
+              patientId: patientId,
+            );
+          }
           context.go(AppRoutes.patientHome);
         }
       case AuthFailure(:final message):
@@ -113,14 +128,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const Spacer(),
 
+              // New-patient activation entry point
+              TextButton(
+                onPressed: () => context.go(AppRoutes.registrationCode),
+                child: Text(
+                  l10n.loginNewPatient,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1A7E95),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+
               // Worker registration entry point
               Padding(
                 padding: const EdgeInsets.only(bottom: 24),
                 child: TextButton(
                   onPressed: () => context.push(AppRoutes.workerRegistration),
-                  child: const Text(
-                    'Register as Healthcare Worker',
-                    style: TextStyle(
+                  child: Text(
+                    l10n.loginWorkerRegister,
+                    style: const TextStyle(
                       fontSize: 13,
                       color: Color(0xFF165B9E),
                       fontWeight: FontWeight.w600,

@@ -31,6 +31,10 @@ class Patients extends Table {
   TextColumn get caregiverPhone =>
       text().named('caregiver_phone').nullable()();
 
+  // Caregiver relationship label — e.g. 'Mother', 'Spouse / Partner'
+  TextColumn get caregiverRelationship =>
+      text().named('caregiver_relationship').nullable()();
+
   // Risk level: 'low' | 'medium' | 'high' — recalculated by risk engine
   TextColumn get riskLevel =>
       text().named('risk_level').withDefault(const Constant('low'))();

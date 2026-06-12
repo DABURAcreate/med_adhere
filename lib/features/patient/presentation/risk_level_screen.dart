@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../features/risk_assessment/domain/risk_engine.dart';
@@ -15,7 +16,7 @@ class RiskLevelScreen extends StatelessWidget {
     final patientId = session.currentPatientId;
 
     return MainScaffold(
-      title: 'Risk Level',
+      title: AppLocalizations.of(context)!.riskLevel,
       currentIndex: 3,
       body: patientId == null
           ? const _NoSessionView()
@@ -31,11 +32,11 @@ class _NoSessionView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
-        'No active session.\nPlease log in first.',
+        AppLocalizations.of(context)!.noActiveSession,
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16, color: Colors.grey),
+        style: const TextStyle(fontSize: 16, color: Colors.grey),
       ),
     );
   }
@@ -116,9 +117,9 @@ class _RiskContent extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              'Risk Level',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.riskLevel,
+              style: const TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
@@ -147,7 +148,7 @@ class _RiskContent extends StatelessWidget {
 
             // Numeric score
             Text(
-              'Score: ${result.riskScore}/100',
+              AppLocalizations.of(context)!.riskScore(result.riskScore),
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade600,
@@ -158,17 +159,17 @@ class _RiskContent extends StatelessWidget {
 
             // Adherence stat row
             _StatRow(
-              label: '30-day adherence',
+              label: AppLocalizations.of(context)!.thirtyDayAdherence,
               value: result.adherencePercent,
               color: color,
             ),
             _StatRow(
-              label: 'Current streak',
+              label: AppLocalizations.of(context)!.currentStreak,
               value: '${result.currentStreak} day(s)',
               color: color,
             ),
             _StatRow(
-              label: 'Missed (last 7 days)',
+              label: AppLocalizations.of(context)!.missedLast7Days,
               value: '${result.missedLast7Days}',
               color: result.missedLast7Days > 0 ? Colors.red : Colors.green,
             ),
@@ -176,7 +177,7 @@ class _RiskContent extends StatelessWidget {
 
             // Why this rating card
             _InfoCard(
-              title: 'Why this rating?',
+              title: AppLocalizations.of(context)!.whyThisRating,
               bullets: result.reasons,
               color: color,
             ),
@@ -184,7 +185,7 @@ class _RiskContent extends StatelessWidget {
 
             // What should I do card
             _InfoCard(
-              title: 'What should I do?',
+              title: AppLocalizations.of(context)!.whatShouldIDo,
               bullets: [result.recommendation],
               color: color,
             ),
@@ -194,11 +195,11 @@ class _RiskContent extends StatelessWidget {
             TextButton.icon(
               onPressed: onRefresh,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Recalculate'),
+              label: Text(AppLocalizations.of(context)!.recalculate),
             ),
 
             Text(
-              'Last calculated: ${_formatTime(result.calculatedAt)}',
+              AppLocalizations.of(context)!.lastCalculated(_formatTime(result.calculatedAt)),
               style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
             ),
             const SizedBox(height: 24),
@@ -261,9 +262,9 @@ class _InfoCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.4), width: 1.5),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(

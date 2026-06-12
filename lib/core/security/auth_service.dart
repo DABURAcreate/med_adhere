@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
+// Worker credential cache stored locally so workers can log in offline.
+// Format: [{"workerId":…,"pinHash":…,"fullName":…,"clinicName":…}]
+
 /// Handles PIN hashing and the on-disk session token.
 ///
 /// PIN storage uses SHA-256. This is acceptable for a 4-digit device PIN
@@ -102,5 +105,63 @@ class AuthService {
   static Future<File> _sessionFile() async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/$_sessionFileName');
+  }
+
+  // ── Worker credential cache ───────────────────────────────────────────────
+
+  static const _workerCacheFileName = 'workers_cache.json';
+
+  /// Persists a worker's credentials locally so they can log in without
+  /// internet on subsequent sessions.
+  static Future<void> cacheWorker({
+    required String workerId,
+    required String pinHash,
+    String? fullName,
+    String? clinicName,
+  }) async {
+    final workers = await _loadWorkerCache();
+    final entry = <String, dynamic>{
+      'workerId': workerId,
+      'pinHash': pinHash,
+      'fullName': ?fullName,
+      'clinicName': ?clinicName,
+    };
+    final idx = workers.indexWhere((w) => w['workerId'] == workerId);
+    if (idx >= 0) {
+      workers[idx] = entry;
+    } else {
+      workers.add(entry);
+    }
+    await _saveWorkerCache(workers);
+  }
+
+  /// Returns a cached worker whose pinHash matches, or null if not found.
+  static Future<Map<String, dynamic>?> lookupCachedWorkerByPinHash(
+      String pinHash) async {
+    final workers = await _loadWorkerCache();
+    for (final w in workers) {
+      if (w['pinHash'] == pinHash) return w;
+    }
+    return null;
+  }
+
+  static Future<List<Map<String, dynamic>>> _loadWorkerCache() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$_workerCacheFileName');
+      if (!file.existsSync()) return [];
+      final raw =
+          jsonDecode(file.readAsStringSync()) as List<dynamic>;
+      return raw.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> _saveWorkerCache(
+      List<Map<String, dynamic>> workers) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File('${dir.path}/$_workerCacheFileName');
+    file.writeAsStringSync(jsonEncode(workers));
   }
 }

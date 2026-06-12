@@ -257,7 +257,7 @@ class PatientMgmtRepository {
       final code = (10000 + rand.nextInt(90000)).toString();
       if (_firestore == null) return code; // offline: skip uniqueness check
       final doc =
-          await _firestore!.collection(kColActivationCodes).doc(code).get();
+          await _firestore.collection(kColActivationCodes).doc(code).get();
       if (!doc.exists) return code;
     }
     throw Exception(
@@ -290,7 +290,7 @@ class PatientMgmtRepository {
         'fullName': fullName,
         'conditions': conditions,
         'caregiverPhone': caregiverPhone,
-        if (clinicName != null) 'clinicName': clinicName,
+        'clinicName': ?clinicName,
         'riskLevel': kRiskLow,
         'activationCode': activationCode,
         'isActivated': false,

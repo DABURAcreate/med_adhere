@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
@@ -177,7 +178,7 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
     final summary = _monthSummary();
 
     return MainScaffold(
-      title: 'My Progress',
+      title: AppLocalizations.of(context)!.myProgress,
       currentIndex: 1,
       body: Container(
         color: Colors.white,
@@ -194,24 +195,30 @@ class _AdherenceCalendarScreenState extends State<AdherenceCalendarScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    runSpacing: 8,
                     children: [
                       _StreakBadge(streakDays: _streak),
-                      const Spacer(),
-
-                      const _LegendItem(
-                        color: _AdherenceColors.taken,
-                        label: 'Taken',
-                      ),
-                      const SizedBox(width: 12),
-                      const _LegendItem(
-                        color: _AdherenceColors.partial,
-                        label: 'Partial',
-                      ),
-                      const SizedBox(width: 12),
-                      const _LegendItem(
-                        color: _AdherenceColors.missed,
-                        label: 'Missed',
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _LegendItem(
+                            color: _AdherenceColors.taken,
+                            label: AppLocalizations.of(context)!.taken,
+                          ),
+                          const SizedBox(width: 8),
+                          _LegendItem(
+                            color: _AdherenceColors.partial,
+                            label: AppLocalizations.of(context)!.legendPartial,
+                          ),
+                          const SizedBox(width: 8),
+                          _LegendItem(
+                            color: _AdherenceColors.missed,
+                            label: AppLocalizations.of(context)!.missed,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -358,7 +365,9 @@ class _StreakBadge extends StatelessWidget {
           const Text('🔥', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 6),
           Text(
-            hasStreak ? '$streakDays-day streak' : 'No Streak',
+            hasStreak
+                ? AppLocalizations.of(context)!.streakDays(streakDays)
+                : AppLocalizations.of(context)!.noStreak,
             style: const TextStyle(
               color: Colors.black,
               fontWeight: FontWeight.w700,
@@ -637,9 +646,9 @@ class _DayDetailPanel extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (adherence == null || adherence!.meds.isEmpty)
-            const Text(
-              'No doses logged.',
-              style: TextStyle(color: Colors.white70),
+            Text(
+              AppLocalizations.of(context)!.noDosesLogged,
+              style: const TextStyle(color: Colors.white70),
             )
           else
             ...adherence!.meds.map((m) => _MedRow(dose: m)),
@@ -674,8 +683,8 @@ class _MedRow extends StatelessWidget {
           ),
           Text(
             taken
-                ? 'Taken ${dose.takenAt}'
-                : 'Missed (${dose.scheduledAt})',
+                ? AppLocalizations.of(context)!.doseLoggedAt(dose.takenAt!)
+                : AppLocalizations.of(context)!.doseMissedAt(dose.scheduledAt),
             style: TextStyle(
               color: taken ? Colors.white70 : _AdherenceColors.missed,
               fontSize: 12,
@@ -717,9 +726,9 @@ class _MonthlySummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'This month',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
+          Text(
+            AppLocalizations.of(context)!.thisMonth,
+            style: const TextStyle(color: Colors.white54, fontSize: 13),
           ),
           const SizedBox(height: 6),
           Text(
@@ -733,7 +742,7 @@ class _MonthlySummary extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'You took ${summary.takenDoses} of ${summary.scheduledDoses} scheduled doses.',
+            AppLocalizations.of(context)!.monthlyDosesSummary(summary.takenDoses, summary.scheduledDoses),
             style: const TextStyle(color: Colors.white70, fontSize: 13),
           ),
         ],
@@ -764,14 +773,14 @@ class _PreviousMonthButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: const Color(0xFF1E88E5), width: 1),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.arrow_back, size: 14, color: Colors.black),
-              SizedBox(width: 6),
+              const Icon(Icons.arrow_back, size: 14, color: Colors.black),
+              const SizedBox(width: 6),
               Text(
-                'Previous Month',
-                style: TextStyle(
+                AppLocalizations.of(context)!.previousMonth,
+                style: const TextStyle(
                   color: Colors.black,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,

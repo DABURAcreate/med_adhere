@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/router.dart';
@@ -54,7 +55,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
 
       if (patient == null) {
         setState(() {
-          _error = 'Patient not found.';
+          _error = AppLocalizations.of(context)!.patientNotFoundError;
           _loading = false;
         });
         return;
@@ -85,7 +86,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Could not load patient data: $e';
+          _error = AppLocalizations.of(context)!.couldNotLoadPatient(e.toString());
           _loading = false;
         });
       }
@@ -99,11 +100,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         _ => const Color(0xFF16A34A),
       };
 
-  String _riskLabel(String riskLevel) => switch (riskLevel) {
-        kRiskHigh => 'High Risk',
-        kRiskMedium => 'Med Risk',
-        _ => 'Low Risk',
-      };
+  String _riskLabel(String riskLevel) {
+    final l10n = AppLocalizations.of(context)!;
+    return switch (riskLevel) {
+      kRiskHigh => l10n.highRisk,
+      kRiskMedium => l10n.medRisk,
+      _ => l10n.lowRisk,
+    };
+  }
 
   Color _adherenceColor(double v) => v >= 80
       ? const Color(0xFF16A34A)
@@ -156,7 +160,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
-              _error ?? 'Patient not found.',
+              _error ?? AppLocalizations.of(context)!.patientNotFoundError,
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
@@ -249,10 +253,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           margin: const EdgeInsets.only(right: 16, top: 10, bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _riskColor(p.riskLevel).withOpacity(0.2),
+            color: _riskColor(p.riskLevel).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-                color: _riskColor(p.riskLevel).withOpacity(0.5)),
+                color: _riskColor(p.riskLevel).withValues(alpha: 0.5)),
           ),
           child: Text(
             _riskLabel(p.riskLevel),
@@ -296,7 +300,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4)),
         ],
@@ -311,7 +315,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 height: 56,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
+                    colors: [kP1.withValues(alpha: 0.4), kP3.withValues(alpha: 0.3)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -376,9 +380,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: kP4.withOpacity(0.1),
+                  color: kP4.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kP4.withOpacity(0.3)),
+                  border: Border.all(color: kP4.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -386,7 +390,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     Icon(Icons.lock_rounded, size: 10, color: kP4),
                     const SizedBox(width: 3),
                     Text(
-                      'WORKER',
+                      AppLocalizations.of(context)!.workerBadge,
                       style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
@@ -403,7 +407,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             const Divider(height: 1, thickness: 0.8),
             const SizedBox(height: 12),
             Text(
-              'Conditions',
+              AppLocalizations.of(context)!.summaryConditions,
               style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -425,9 +429,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   Widget _conditionChip(String label) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     decoration: BoxDecoration(
-      color: kP3.withOpacity(0.08),
+      color: kP3.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: kP3.withOpacity(0.25)),
+      border: Border.all(color: kP3.withValues(alpha: 0.25)),
     ),
     child: Text(label,
         style: const TextStyle(
@@ -449,7 +453,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4)),
         ],
@@ -457,7 +461,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Adherence Summary', Icons.insights_rounded),
+          _sectionTitle(AppLocalizations.of(context)!.adherenceSummary, Icons.insights_rounded),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -474,7 +478,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                           height: 1),
                     ),
                     const SizedBox(height: 4),
-                    Text('30-day adherence rate',
+                    Text(AppLocalizations.of(context)!.thirtyDayAdherenceRate,
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500)),
                     const SizedBox(height: 8),
@@ -495,10 +499,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFB91C1C).withOpacity(0.07),
+                  color: const Color(0xFFB91C1C).withValues(alpha: 0.07),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: const Color(0xFFB91C1C).withOpacity(0.2)),
+                      color: const Color(0xFFB91C1C).withValues(alpha: 0.2)),
                 ),
                 child: Column(
                   children: [
@@ -512,7 +516,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'missed\ndoses',
+                      AppLocalizations.of(context)!.missedDosesLabel,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 10,
@@ -528,7 +532,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           const Divider(height: 1, thickness: 0.8),
           const SizedBox(height: 14),
           Text(
-            'Last 14 Days',
+            AppLocalizations.of(context)!.last14Days,
             style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -541,11 +545,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _legendDot(const Color(0xFF16A34A), 'Taken'),
+              _legendDot(const Color(0xFF16A34A), AppLocalizations.of(context)!.taken),
               const SizedBox(width: 16),
-              _legendDot(const Color(0xFFB91C1C), 'Missed'),
+              _legendDot(const Color(0xFFB91C1C), AppLocalizations.of(context)!.missed),
               const SizedBox(width: 16),
-              _legendDot(Colors.grey.shade300, 'No data'),
+              _legendDot(Colors.grey.shade300, AppLocalizations.of(context)!.noData),
             ],
           ),
         ],
@@ -635,7 +639,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4)),
           ],
@@ -643,11 +647,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle('Medications', Icons.medication_rounded),
+            _sectionTitle(AppLocalizations.of(context)!.medications, Icons.medication_rounded),
             const SizedBox(height: 14),
             Center(
               child: Text(
-                'No medications scheduled.',
+                AppLocalizations.of(context)!.noMedicationsScheduled,
                 style: TextStyle(
                     fontSize: 13, color: Colors.grey.shade400),
               ),
@@ -671,7 +675,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4)),
         ],
@@ -679,7 +683,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionTitle('Medications', Icons.medication_rounded),
+          _sectionTitle(AppLocalizations.of(context)!.medications, Icons.medication_rounded),
           const SizedBox(height: 14),
           ..._medications.where((m) => m.isActive).toList().asMap().entries.map((e) {
             final isLast = e.key == _medications.where((m) => m.isActive).length - 1;
@@ -709,7 +713,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: kP4.withOpacity(0.1),
+            color: kP4.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(Icons.medication_liquid_rounded, color: kP4, size: 22),
@@ -739,7 +743,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: kP2.withOpacity(0.07),
+                      color: kP2.withValues(alpha: 0.07),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
@@ -794,10 +798,10 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       decoration: BoxDecoration(
         color: kCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: rc.withOpacity(0.2)),
+        border: Border.all(color: rc.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4)),
         ],
@@ -811,14 +815,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: rc.withOpacity(0.1),
+              color: rc.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child:
                 Icon(Icons.info_outline_rounded, color: rc, size: 20),
           ),
           title: Text(
-            'Why this risk level?',
+            AppLocalizations.of(context)!.whyThisRiskLevel,
             style: TextStyle(
                 fontSize: 14, fontWeight: FontWeight.w800, color: kP2),
           ),
@@ -840,9 +844,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: rc.withOpacity(0.05),
+                color: rc.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: rc.withOpacity(0.15)),
+                border: Border.all(color: rc.withValues(alpha: 0.15)),
               ),
               child: Text(
                 riskExplanation,
@@ -859,7 +863,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   // ── Actions section ───────────────────────────────────────────────────────────
-  Widget _buildActions(BuildContext context) => Container(
+  Widget _buildActions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -867,7 +873,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4)),
       ],
@@ -875,11 +881,11 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Actions', Icons.touch_app_rounded),
+        _sectionTitle(l10n.actionsTitle, Icons.touch_app_rounded),
         const SizedBox(height: 14),
         _actionButton(
           icon: Icons.calendar_month_rounded,
-          label: 'Schedule Follow-up',
+          label: l10n.scheduleFollowUp,
           color: kP3,
           onTap: () => context.push(
               '/worker/patients/${widget.patientId}/follow-up'),
@@ -887,14 +893,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         const SizedBox(height: 10),
         _actionButton(
           icon: Icons.sms_rounded,
-          label: 'Send SMS Reminder',
+          label: l10n.sendSmsReminder,
           color: kP4,
           onTap: () => _showSmsDialog(context),
         ),
         const SizedBox(height: 10),
         _actionButton(
           icon: Icons.edit_calendar_rounded,
-          label: 'Edit Medication Schedule',
+          label: l10n.editMedicationSchedule,
           color: const Color(0xFF6D28D9),
           onTap: () => context.push(
               '/worker/patients/${widget.patientId}/schedule'),
@@ -902,13 +908,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         const SizedBox(height: 10),
         _actionButton(
           icon: Icons.people_rounded,
-          label: 'Manage Caregiver',
+          label: l10n.manageCaregiver,
           color: kP4,
           onTap: () => context.push(AppRoutes.caregiverLink),
         ),
       ],
     ),
   );
+  }
 
   Widget _actionButton({
     required IconData icon,
@@ -922,7 +929,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         label: Text(label),
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color.withOpacity(0.6), width: 1.5),
+          side: BorderSide(color: color.withValues(alpha: 0.6), width: 1.5),
           padding:
               const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
           alignment: Alignment.centerLeft,
@@ -935,21 +942,22 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       );
 
   void _showSmsDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final name = _patient?.fullName.split(' ').first ?? 'Patient';
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Send SMS Reminder',
-            style: TextStyle(
+        title: Text(l10n.sendSmsReminder,
+            style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w800, color: kP2)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Send a medication reminder SMS to $name?',
+              l10n.sendSmsDialogContent(name),
               style: TextStyle(
                   fontSize: 13, color: Colors.grey.shade700),
             ),
@@ -959,7 +967,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               decoration: BoxDecoration(
                 color: kBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kP4.withOpacity(0.2)),
+                border: Border.all(color: kP4.withValues(alpha: 0.2)),
               ),
               child: Text(
                 '"Hi $name, this is a reminder to take your medication today. Please contact your clinic if you have any questions."',
@@ -975,14 +983,14 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
+            child: Text(l10n.cancel,
                 style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('SMS sent to $name'),
+                content: Text(l10n.smsSent(name)),
                 backgroundColor: const Color(0xFF16A34A),
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
@@ -995,8 +1003,8 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Send',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(l10n.send,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -1004,7 +1012,9 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   // ── Follow-up log ─────────────────────────────────────────────────────────────
-  Widget _buildFollowUpLog() => Container(
+  Widget _buildFollowUpLog() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     margin: const EdgeInsets.symmetric(horizontal: 16),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -1012,7 +1022,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4)),
       ],
@@ -1020,13 +1030,13 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionTitle('Follow-up Log', Icons.history_rounded),
+        _sectionTitle(l10n.followUpLog, Icons.history_rounded),
         const SizedBox(height: 14),
         Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No follow-up notes yet.',
+              l10n.noFollowUpNotes,
               style: TextStyle(
                   fontSize: 13, color: Colors.grey.shade400),
             ),
@@ -1035,6 +1045,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       ],
     ),
   );
+  }
 
   // ── Section title helper ──────────────────────────────────────────────────────
   Widget _sectionTitle(String label, IconData icon) => Row(
@@ -1043,7 +1054,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: kP3.withOpacity(0.1),
+          color: kP3.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, size: 16, color: kP3),

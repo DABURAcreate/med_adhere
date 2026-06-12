@@ -38,6 +38,10 @@ dependencies:
   # PIN hashing
   crypto: ^3.0.3
 
+  # Push notifications
+  flutter_local_notifications: ^18.0.0
+  timezone: ^0.9.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

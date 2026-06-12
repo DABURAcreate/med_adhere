@@ -1,13 +1,19 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+
+import '../../../core/database/app_database.dart';
+import '../../../core/notifications/notification_service.dart';
+import '../../../providers/session_provider.dart';
+import '../../patient/data/patient_repository.dart';
+import '../data/reminder_repository.dart';
 
 /// Screen 08 — Patient · Reminder Settings
 ///
-/// Lets the patient customise reminder times and frequency for each
-/// medication. Each medication is an expandable card; reminder times
-/// can be added, edited (via Material 3 TimePicker) and individually
-/// toggled on/off.
-///
-/// File: features/reminders/presentation/reminder_settings_screen.dart
+/// Loads the patient's active medications and their reminder times from the
+/// local database, lets the patient adjust times / toggle individual reminders,
+/// and persists changes back to the DB + reschedules push notifications on save.
 class ReminderSettingsScreen extends StatefulWidget {
   const ReminderSettingsScreen({super.key});
 
@@ -17,52 +23,80 @@ class ReminderSettingsScreen extends StatefulWidget {
 }
 
 class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
-  // Brand teal used for the save button + accents.
   static const Color _teal = Color(0xFF009688);
 
-  late List<_MedicationReminders> _medications;
+  List<_MedicationReminders> _medications = [];
+  bool _loading = true;
   bool _dirty = false;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    // Mock data — in production this comes from reminders_table.dart
-    // through a repository / bloc.
-    _medications = [
-      _MedicationReminders(
-        id: 'med_1',
-        name: 'Tenofovir / FTC',
-        dosage: '300 mg / 200 mg · once daily',
-        expanded: true,
-        reminders: [
-          _Reminder(id: 'r1', time: const TimeOfDay(hour: 8, minute: 0), enabled: true),
-        ],
-      ),
-      _MedicationReminders(
-        id: 'med_2',
-        name: 'Dolutegravir',
-        dosage: '50 mg · once daily',
-        expanded: false,
-        reminders: [
-          _Reminder(id: 'r2', time: const TimeOfDay(hour: 20, minute: 0), enabled: true),
-        ],
-      ),
-      _MedicationReminders(
-        id: 'med_3',
-        name: 'Cotrimoxazole',
-        dosage: '960 mg · once daily',
-        expanded: false,
-        reminders: [
-          _Reminder(id: 'r3', time: const TimeOfDay(hour: 12, minute: 30), enabled: false),
-        ],
-      ),
-    ];
+    _loadData();
   }
 
-  // ---------------------------------------------------------------------------
-  // Actions
-  // ---------------------------------------------------------------------------
+  // ── Data loading ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadData() async {
+    final patientId =
+        context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) {
+      setState(() => _loading = false);
+      return;
+    }
+
+    final patientRepo = context.read<PatientRepository>();
+    final meds = await patientRepo.getMedications(patientId);
+    final reminders = await patientRepo.getRemindersForPatient(patientId);
+
+    // Group reminders by medicationId.
+    final remindersByMed = <int, List<Reminder>>{};
+    for (final r in reminders) {
+      remindersByMed.putIfAbsent(r.medicationId, () => []).add(r);
+    }
+
+    final items = meds
+        .where((m) => m.isActive)
+        .map((m) {
+          final medReminders = remindersByMed[m.id] ?? [];
+          return _MedicationReminders(
+            dbId: m.id,
+            name: m.name,
+            dosage: '${m.dosage} · ${m.frequency}',
+            reminders: medReminders.isEmpty
+                ? [
+                    _Reminder(
+                      dbId: null,
+                      time: const TimeOfDay(hour: 8, minute: 0),
+                      enabled: true,
+                    )
+                  ]
+                : medReminders.map((r) {
+                    final parts = r.scheduledTime.split(':');
+                    final h = int.tryParse(parts[0]) ?? 8;
+                    final min = parts.length > 1
+                        ? (int.tryParse(parts[1]) ?? 0)
+                        : 0;
+                    return _Reminder(
+                      dbId: r.id,
+                      time: TimeOfDay(hour: h, minute: min),
+                      enabled: r.isActive,
+                    );
+                  }).toList(),
+          );
+        })
+        .toList();
+
+    if (mounted) {
+      setState(() {
+        _medications = items;
+        _loading = false;
+      });
+    }
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
 
   void _toggleExpanded(int medIndex) {
     setState(() {
@@ -75,10 +109,6 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: current,
-      builder: (ctx, child) {
-        // Force 24h or honour locale — leaving as locale default.
-        return child ?? const SizedBox.shrink();
-      },
     );
     if (picked != null && picked != current) {
       setState(() {
@@ -99,7 +129,7 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
     setState(() {
       _medications[medIndex].reminders.add(
         _Reminder(
-          id: 'r_${DateTime.now().microsecondsSinceEpoch}',
+          dbId: null,
           time: const TimeOfDay(hour: 9, minute: 0),
           enabled: true,
         ),
@@ -117,23 +147,58 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
   }
 
   Future<void> _save() async {
+    final patientId =
+        context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) return;
+
     setState(() => _saving = true);
-    // TODO: write to reminders_table.dart + reschedule
-    // flutter_local_notifications. For now we just simulate.
-    await Future.delayed(const Duration(milliseconds: 600));
+
+    final reminderRepo = context.read<ReminderRepository>();
+    final db = context.read<AppDatabase>();
+
+    for (final med in _medications) {
+      // Replace all reminders for this medication with what's in the UI.
+      await reminderRepo.deleteRemindersForMedication(med.dbId);
+
+      for (final r in med.reminders) {
+        final timeStr =
+            '${r.time.hour.toString().padLeft(2, '0')}:'
+            '${r.time.minute.toString().padLeft(2, '0')}';
+        await reminderRepo.insertReminder(
+          RemindersCompanion(
+            patientId: Value(patientId),
+            medicationId: Value(med.dbId),
+            scheduledTime: Value(timeStr),
+            isActive: Value(r.enabled),
+            isSynced: const Value(false),
+          ),
+        );
+      }
+    }
+
+    // Reschedule all push notifications to reflect the updated schedule.
+    await NotificationService.scheduleAllForPatient(
+      db: db,
+      patientId: patientId,
+    );
+
+    // Reload DB state into local models so dbIds are updated.
+    await _loadData();
+
     if (!mounted) return;
     setState(() {
       _saving = false;
       _dirty = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reminders saved')),
+      SnackBar(
+        content: Text(AppLocalizations.of(context)!.remindersSaved),
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -145,46 +210,92 @@ class _ReminderSettingsScreenState extends State<ReminderSettingsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         leading: const BackButton(color: Colors.black),
-        title: const Text(
-          'Reminder Settings',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Text(
+          AppLocalizations.of(context)!.reminderSettingsTitle,
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         centerTitle: false,
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                children: [
-                  for (var i = 0; i < _medications.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _MedicationCard(
-                        med: _medications[i],
-                        teal: _teal,
-                        onToggleExpanded: () => _toggleExpanded(i),
-                        onEditTime: (rIdx) => _editTime(i, rIdx),
-                        onToggleReminder: (rIdx, v) =>
-                            _toggleReminder(i, rIdx, v),
-                        onDeleteReminder: (rIdx) => _deleteReminder(i, rIdx),
-                        onAddReminder: () => _addReminder(i),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _medications.isEmpty
+                ? _emptyState()
+                : Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          padding:
+                              const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                          children: [
+                            for (var i = 0;
+                                i < _medications.length;
+                                i++)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 12),
+                                child: _MedicationCard(
+                                  med: _medications[i],
+                                  teal: _teal,
+                                  onToggleExpanded: () =>
+                                      _toggleExpanded(i),
+                                  onEditTime: (rIdx) =>
+                                      _editTime(i, rIdx),
+                                  onToggleReminder: (rIdx, v) =>
+                                      _toggleReminder(i, rIdx, v),
+                                  onDeleteReminder: (rIdx) =>
+                                      _deleteReminder(i, rIdx),
+                                  onAddReminder: () =>
+                                      _addReminder(i),
+                                ),
+                              ),
+                            const SizedBox(height: 8),
+                            _FrequencyNote(),
+                            const SizedBox(height: 12),
+                          ],
+                        ),
                       ),
-                    ),
-                  const SizedBox(height: 8),
-                  _FrequencyNote(),
-                  const SizedBox(height: 12),
-                ],
+                      _SaveBar(
+                        teal: _teal,
+                        enabled: _dirty && !_saving,
+                        saving: _saving,
+                        onPressed: _save,
+                      ),
+                    ],
+                  ),
+      ),
+    );
+  }
+
+  Widget _emptyState() {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notifications_off_outlined,
+                size: 56, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              l10n.noActiveMedicationsTitle,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
               ),
             ),
-            // Sticky save button.
-            _SaveBar(
-              teal: _teal,
-              enabled: _dirty && !_saving,
-              saving: _saving,
-              onPressed: _save,
+            const SizedBox(height: 8),
+            Text(
+              l10n.noActiveMedicationsSubtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade500,
+                height: 1.4,
+              ),
             ),
           ],
         ),
@@ -227,7 +338,6 @@ class _MedicationCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Header row — tap to expand/collapse.
           InkWell(
             borderRadius: BorderRadius.circular(14),
             onTap: onToggleExpanded,
@@ -260,7 +370,7 @@ class _MedicationCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$activeCount of ${med.reminders.length} reminder${med.reminders.length == 1 ? '' : 's'} on',
+                          AppLocalizations.of(context)!.remindersOn(activeCount, med.reminders.length),
                           style: const TextStyle(
                             fontSize: 12,
                             color: Color(0xFF6B7280),
@@ -279,7 +389,6 @@ class _MedicationCard extends StatelessWidget {
               ),
             ),
           ),
-          // Expanded body.
           AnimatedCrossFade(
             duration: const Duration(milliseconds: 180),
             crossFadeState: med.expanded
@@ -291,7 +400,8 @@ class _MedicationCard extends StatelessWidget {
                 const Divider(height: 1, color: Color(0xFFF0F1F3)),
                 if (med.dosage != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    padding:
+                        const EdgeInsets.fromLTRB(16, 12, 16, 4),
                     child: Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
@@ -314,7 +424,8 @@ class _MedicationCard extends StatelessWidget {
                         : null,
                   ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 10),
+                  padding:
+                      const EdgeInsets.fromLTRB(8, 4, 8, 10),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -323,12 +434,14 @@ class _MedicationCard extends StatelessWidget {
                         foregroundColor: teal,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 8),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        tapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                       ),
                       icon: const Icon(Icons.add, size: 18),
-                      label: const Text(
-                        'Add reminder time',
-                        style: TextStyle(fontWeight: FontWeight.w600),
+                      label: Text(
+                        AppLocalizations.of(context)!.addReminderTime,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
@@ -343,7 +456,7 @@ class _MedicationCard extends StatelessWidget {
 }
 
 // =============================================================================
-// One reminder row (time + toggle + delete)
+// One reminder row
 // =============================================================================
 
 class _ReminderRow extends StatelessWidget {
@@ -363,13 +476,16 @@ class _ReminderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final timeStr = _formatTime(context, reminder.time);
+    final timeStr = MaterialLocalizations.of(context).formatTimeOfDay(
+      reminder.time,
+      alwaysUse24HourFormat:
+          MediaQuery.of(context).alwaysUse24HourFormat,
+    );
     final muted = !reminder.enabled;
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       child: Row(
         children: [
-          // Time pill — tap opens TimePicker.
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
@@ -382,7 +498,9 @@ class _ReminderRow extends StatelessWidget {
                     Icon(
                       Icons.access_time,
                       size: 20,
-                      color: muted ? const Color(0xFF9CA3AF) : teal,
+                      color: muted
+                          ? const Color(0xFF9CA3AF)
+                          : teal,
                     ),
                     const SizedBox(width: 12),
                     Text(
@@ -393,7 +511,9 @@ class _ReminderRow extends StatelessWidget {
                         color: muted
                             ? const Color(0xFF9CA3AF)
                             : Colors.black,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                        fontFeatures: const [
+                          FontFeature.tabularFigures()
+                        ],
                       ),
                     ),
                   ],
@@ -406,25 +526,17 @@ class _ReminderRow extends StatelessWidget {
               onPressed: onDelete,
               icon: const Icon(Icons.delete_outline,
                   color: Color(0xFF9CA3AF), size: 20),
-              tooltip: 'Remove reminder',
+              tooltip: AppLocalizations.of(context)!.removeReminderTooltip,
               visualDensity: VisualDensity.compact,
             ),
           Switch(
             value: reminder.enabled,
             onChanged: onToggle,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: teal,
           ),
         ],
       ),
-    );
-  }
-
-  String _formatTime(BuildContext context, TimeOfDay t) {
-    // Honours device 12/24-hour preference via MaterialLocalizations.
-    return MaterialLocalizations.of(context).formatTimeOfDay(
-      t,
-      alwaysUse24HourFormat: MediaQuery.of(context).alwaysUse24HourFormat,
     );
   }
 }
@@ -439,14 +551,12 @@ class _FrequencyNote extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline,
-            size: 16, color: Color(0xFF9CA3AF)),
+        const Icon(Icons.info_outline, size: 16, color: Color(0xFF9CA3AF)),
         const SizedBox(width: 8),
-        const Expanded(
+        Expanded(
           child: Text(
-            'Your healthcare worker may increase your reminder frequency '
-                'based on your adherence.',
-            style: TextStyle(
+            AppLocalizations.of(context)!.reminderFrequencyNote,
+            style: const TextStyle(
               fontSize: 12,
               color: Color(0xFF6B7280),
               height: 1.4,
@@ -502,14 +612,14 @@ class _SaveBar extends StatelessWidget {
           ),
           child: saving
               ? const SizedBox(
-            height: 22,
-            width: 22,
-            child: CircularProgressIndicator(
-              color: Colors.white,
-              strokeWidth: 2.5,
-            ),
-          )
-              : const Text('Save'),
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : Text(AppLocalizations.of(context)!.save),
         ),
       ),
     );
@@ -517,33 +627,32 @@ class _SaveBar extends StatelessWidget {
 }
 
 // =============================================================================
-// Data models — replace with your domain models when wiring up the repo.
+// Local UI models
 // =============================================================================
 
 class _MedicationReminders {
   _MedicationReminders({
-    required this.id,
+    required this.dbId,
     required this.name,
     this.dosage,
     required this.reminders,
-    this.expanded = false,
   });
 
-  final String id;
+  final int dbId;
   final String name;
   final String? dosage;
-  bool expanded;
+  bool expanded = false;
   final List<_Reminder> reminders;
 }
 
 class _Reminder {
   _Reminder({
-    required this.id,
+    required this.dbId,
     required this.time,
     required this.enabled,
   });
 
-  final String id;
+  final int? dbId;
   TimeOfDay time;
   bool enabled;
 }

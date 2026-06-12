@@ -41,12 +41,12 @@ class AppDatabase extends _$AppDatabase {
   /// Named constructor for injecting a test executor.
   /// Usage in tests:
   ///   final db = AppDatabase.forTesting(NativeDatabase.memory());
-  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
+  AppDatabase.forTesting(super.executor);
 
   // ─── Schema version ───────────────────────────────────────────────────────
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   // ─── Migrations ───────────────────────────────────────────────────────────
 
@@ -75,6 +75,10 @@ class AppDatabase extends _$AppDatabase {
       // v4: clinic name field added to patients for clinic-level filtering.
       if (from < 4) {
         await m.addColumn(patients, patients.clinicName);
+      }
+      // v5: caregiver relationship label added to patients.
+      if (from < 5) {
+        await m.addColumn(patients, patients.caregiverRelationship);
       }
     },
     beforeOpen: (details) async {

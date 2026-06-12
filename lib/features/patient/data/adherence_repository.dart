@@ -310,6 +310,92 @@ class AdherenceRepository {
     return _riskEngine.calculate(patientId);
   }
 
+  // ── Auto-mark missed ──────────────────────────────────────────────────────
+
+  /// Scans the last [lookbackDays] days for dose slots that were never logged
+  /// and inserts "missed" records for each one that has passed the [grace]
+  /// window.  Called once per session start so the risk engine stays accurate
+  /// even when the patient doesn't open the app every day.
+  ///
+  /// Returns the number of auto-inserted logs.
+  Future<int> autoMarkPastDoses(
+    int patientId, {
+    Duration grace = const Duration(hours: 4),
+    int lookbackDays = 7,
+  }) async {
+    final now = DateTime.now();
+    final cutoff = now.subtract(grace);
+    final meds =
+        await _db.medicationsDao.getActiveMedicationsForPatient(patientId);
+    final reminders =
+        await _db.remindersDao.getActiveRemindersForPatient(patientId);
+
+    final remindersByMed = <int, List<Reminder>>{};
+    for (final r in reminders) {
+      remindersByMed.putIfAbsent(r.medicationId, () => []).add(r);
+    }
+
+    int count = 0;
+
+    for (int daysAgo = lookbackDays; daysAgo >= 0; daysAgo--) {
+      final day = now.subtract(Duration(days: daysAgo));
+      final dayDate = DateTime(day.year, day.month, day.day);
+
+      for (final med in meds) {
+        final medReminders = remindersByMed[med.id] ?? [];
+        final slotsToCheck = medReminders.isEmpty
+            ? [dayDate] // one midnight slot per medication
+            : medReminders.map((r) {
+                final parts = r.scheduledTime.split(':');
+                final h = int.tryParse(parts[0]) ?? 0;
+                final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+                return DateTime(dayDate.year, dayDate.month, dayDate.day, h, m);
+              }).toList();
+
+        for (final scheduledAt in slotsToCheck) {
+          // Only mark slots that are past the grace window.
+          if (!scheduledAt.isBefore(cutoff)) continue;
+
+          final existing =
+              await _db.adherenceLogsDao.getLogForScheduledDose(
+            patientId: patientId,
+            medicationId: med.id,
+            scheduledAt: scheduledAt,
+          );
+          if (existing != null) continue;
+
+          final matchedReminder = medReminders.isEmpty
+              ? null
+              : reminders
+                  .where((r) =>
+                      r.medicationId == med.id &&
+                      '${scheduledAt.hour.toString().padLeft(2, "0")}:${scheduledAt.minute.toString().padLeft(2, "0")}' ==
+                          r.scheduledTime)
+                  .firstOrNull;
+
+          await _db.adherenceLogsDao.insertLog(
+            AdherenceLogsCompanion(
+              patientId: Value(patientId),
+              medicationId: Value(med.id),
+              reminderId: Value(matchedReminder?.id),
+              status: const Value(kStatusMissed),
+              scheduledAt: Value(scheduledAt),
+              isManualEntry: const Value(false),
+              isSynced: const Value(false),
+            ),
+          );
+          count++;
+        }
+      }
+    }
+
+    if (count > 0) {
+      debugPrint('[Adherence] Auto-marked $count missed dose(s) for patient $patientId.');
+      await _riskEngine.calculate(patientId);
+    }
+    return count;
+  }
+
   // ── Aggregates ─────────────────────────────────────────────────────────────
 
   Future<Map<String, int>> getStatusCounts({

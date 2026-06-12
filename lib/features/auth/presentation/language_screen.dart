@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/locale_provider.dart';
-import '../data/auth_repository.dart';
 import '../widgets/continue_button.dart';
 import '../widgets/med_adhere_header.dart';
 import '../../../app/router.dart';
@@ -34,7 +34,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
 
-    context.go(AppRoutes.registrationCode);
+    context.go(AppRoutes.login);
   }
 
   Widget _buildLanguageOption({
@@ -90,6 +90,7 @@ class _LanguageScreenState extends State<LanguageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFE9E9E9),
       body: SafeArea(
@@ -114,10 +115,10 @@ class _LanguageScreenState extends State<LanguageScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Language:',
+                        Text(
+                          l10n.languageLabel,
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: Colors.black,
@@ -149,12 +150,10 @@ class _LanguageScreenState extends State<LanguageScreen> {
                         const SizedBox(height: 16),
                         Center(
                           child: TextButton(
-                            onPressed: () {
-                              context.go(AppRoutes.login);
-                            },
-                            child: const Text(
-                              'Healthcare worker login',
-                              style: TextStyle(
+                            onPressed: () => context.go(AppRoutes.login),
+                            child: Text(
+                              l10n.languageAlreadyRegistered,
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Color.fromARGB(255, 25, 95, 88),

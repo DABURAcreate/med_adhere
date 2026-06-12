@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
@@ -20,19 +21,20 @@ class MedicationDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final patientId = context.watch<SessionProvider>().currentPatientId;
+    final l10n = AppLocalizations.of(context)!;
 
     if (patientId == null) {
-      return const MainScaffold(
-        title: 'Medications',
+      return MainScaffold(
+        title: l10n.medications,
         currentIndex: 2,
-        body: Center(child: Text('No patient session found.')),
+        body: Center(child: Text(l10n.noPatientSessionShort)),
       );
     }
 
     final patientRepo = context.read<PatientRepository>();
 
     return MainScaffold(
-      title: 'Medications',
+      title: l10n.medications,
       currentIndex: 2,
       body: Container(
         color: Colors.white,
@@ -41,10 +43,10 @@ class MedicationDetailScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Center(
+              Center(
                 child: Text(
-                  'Medications',
-                  style: TextStyle(
+                  l10n.medications,
+                  style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
@@ -65,10 +67,10 @@ class MedicationDetailScreen extends StatelessWidget {
                         meds.where((m) => m.isActive).toList();
 
                     if (activeMeds.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
-                          'No medications assigned yet.',
-                          style: TextStyle(color: Colors.grey, fontSize: 15),
+                          l10n.noMedicationsAssigned,
+                          style: const TextStyle(color: Colors.grey, fontSize: 15),
                         ),
                       );
                     }
@@ -88,7 +90,7 @@ class MedicationDetailScreen extends StatelessWidget {
 
                         return ListView.separated(
                           itemCount: activeMeds.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 16),
                           itemBuilder: (context, index) {
                             final med = activeMeds[index];
@@ -158,7 +160,7 @@ class MedicationCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -199,7 +201,7 @@ class MedicationCard extends StatelessWidget {
 
           // Dosage
           Text(
-            'Dosage: $dosage',
+            AppLocalizations.of(context)!.dosageLabel(dosage),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -213,12 +215,12 @@ class MedicationCard extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.3),
+                color: Colors.orange.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'INACTIVE',
-                style: TextStyle(
+              child: Text(
+                AppLocalizations.of(context)!.inactive,
+                style: const TextStyle(
                   color: Colors.orangeAccent,
                   fontWeight: FontWeight.w800,
                   fontSize: 11,
@@ -230,9 +232,9 @@ class MedicationCard extends StatelessWidget {
           const SizedBox(height: 14),
 
           // Schedule section
-          const Text(
-            'Your Schedule:',
-            style: TextStyle(
+          Text(
+            AppLocalizations.of(context)!.yourSchedule,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -249,9 +251,9 @@ class MedicationCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: doseTimes.isEmpty
-                ? const Text(
-                    'No scheduled times yet.',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                ? Text(
+                    AppLocalizations.of(context)!.noScheduledTimes,
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,9 +271,9 @@ class MedicationCard extends StatelessWidget {
 
           if (instructions != null && instructions!.isNotEmpty) ...[
             const SizedBox(height: 14),
-            const Text(
-              'How to Take:',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.howToTake,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,

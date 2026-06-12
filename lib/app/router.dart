@@ -214,9 +214,8 @@ class AppRouter {
 
     if (isAuthRoute) {
       // Authenticated users don't need auth screens — send to their home.
-      /*if (!isAuth) return null;
-      return session.isWorker ? AppRoutes.dashboard : AppRoutes.patientHome;*/
-      return null;
+      if (!isAuth) return null;
+      return session.isWorker ? AppRoutes.dashboard : AppRoutes.patientHome;
     }
 
     // All non-auth routes require authentication.

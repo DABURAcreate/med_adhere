@@ -34,8 +34,8 @@ class _PinInputRowState extends State<PinInputRow> {
 
   @override
   void dispose() {
-    for (final node in _focusNodes) node.dispose();
-    for (final ctrl in _controllers) ctrl.dispose();
+    for (final node in _focusNodes) { node.dispose(); }
+    for (final ctrl in _controllers) { ctrl.dispose(); }
     super.dispose();
   }
 
@@ -59,10 +59,10 @@ class _PinInputRowState extends State<PinInputRow> {
     final double fontSize = widget.boxSize * 0.4;
     final double verticalPadding = widget.boxSize * 0.285;
 
-    return RawKeyboardListener(
+    return KeyboardListener(
       focusNode: FocusNode(),
-      onKey: (event) {
-        if (event is RawKeyDownEvent &&
+      onKeyEvent: (event) {
+        if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.backspace &&
             _controllers[index].text.isEmpty &&
             index > 0) {

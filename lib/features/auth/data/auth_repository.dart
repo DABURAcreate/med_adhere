@@ -286,7 +286,29 @@ class AuthRepository {
       }
       debugPrint('[Auth] No local patient match.');
 
-      // ── Phase 2 & 3: Firestore fallback (requires connectivity) ───────────
+      // ── Phase 2: Cached workers (offline-capable) ──────────────────────────
+      debugPrint('[Auth] Checking local worker cache...');
+      final cachedWorker =
+          await AuthService.lookupCachedWorkerByPinHash(pinHash);
+      if (cachedWorker != null) {
+        final workerId = cachedWorker['workerId'] as String;
+        final clinicName = cachedWorker['clinicName'] as String?;
+        final fullName = cachedWorker['fullName'] as String?;
+        debugPrint('[Auth] Worker found in local cache (id=$workerId).');
+        await AuthService.saveSession(
+          workerId: workerId,
+          workerClinicName: clinicName,
+          workerFullName: fullName,
+        );
+        return AuthSuccess(
+          role: AuthRole.worker,
+          userId: workerId,
+          workerClinicName: clinicName,
+          workerFullName: fullName,
+        );
+      }
+
+      // ── Phase 3 & 4: Firestore fallback (requires connectivity) ───────────
       if (!kFirebaseConfigured) {
         return patients.isEmpty
             ? const AuthFailure('No account found. Please register first.')
@@ -305,7 +327,7 @@ class AuthRepository {
 
       final fs = FirebaseFirestore.instance;
 
-      // ── Phase 2: Firestore workers ─────────────────────────────────────────
+      // ── Phase 3: Firestore workers ─────────────────────────────────────────
       debugPrint('[Auth] Checking Firestore workers...');
       final workerSnap = await fs
           .collection(kColWorkers)
@@ -319,6 +341,13 @@ class AuthRepository {
         final clinicName = workerData['clinicName'] as String?;
         final fullName = workerData['fullName'] as String?;
         debugPrint('[Auth] Worker found in Firestore (id=$workerId, clinic=$clinicName).');
+        // Cache credentials for future offline logins.
+        await AuthService.cacheWorker(
+          workerId: workerId,
+          pinHash: pinHash,
+          fullName: fullName,
+          clinicName: clinicName,
+        );
         await AuthService.saveSession(
           workerId: workerId,
           workerClinicName: clinicName,
@@ -333,7 +362,7 @@ class AuthRepository {
       }
       debugPrint('[Auth] No Firestore worker match.');
 
-      // ── Phase 3: Firestore patient recovery (new / reinstalled device) ─────
+      // ── Phase 4: Firestore patient recovery (new / reinstalled device) ─────
       debugPrint('[Auth] Checking Firestore patients for recovery...');
       final patientSnap = await fs
           .collection(kColPatients)

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
@@ -17,10 +18,10 @@ const kWarning = Color(0xFFD97706);
 enum _FollowUpType { call, visit, sms }
 
 extension _FollowUpTypeX on _FollowUpType {
-  String get label => switch (this) {
-    _FollowUpType.call => 'Call',
-    _FollowUpType.visit => 'Visit',
-    _FollowUpType.sms => 'SMS',
+  String localizedLabel(AppLocalizations l10n) => switch (this) {
+    _FollowUpType.call => l10n.followUpCall,
+    _FollowUpType.visit => l10n.followUpVisit,
+    _FollowUpType.sms => l10n.followUpSms,
   };
 
   IconData get icon => switch (this) {
@@ -125,7 +126,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             surface: kCard,
             onSurface: kP2,
           ),
-          dialogBackgroundColor: kCard,
+          dialogTheme: const DialogThemeData(backgroundColor: kCard),
         ),
         child: child!,
       ),
@@ -172,6 +173,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   void _showSuccessSheet() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -191,21 +193,21 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: kSuccess.withOpacity(0.1),
+                color: kSuccess.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.check_circle_rounded,
                   size: 34, color: kSuccess),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Follow-up Scheduled',
-              style: TextStyle(
+            Text(
+              l10n.followUpScheduled,
+              style: const TextStyle(
                   fontSize: 18, fontWeight: FontWeight.w900, color: kP2),
             ),
             const SizedBox(height: 6),
             Text(
-              'Saved locally and will sync when online.',
+              l10n.savedLocally,
               style:
               TextStyle(fontSize: 12, color: Colors.grey.shade500),
             ),
@@ -213,7 +215,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             // Summary pill row
             _successPill(
               icon: _type.icon,
-              label: _type.label,
+              label: _type.localizedLabel(l10n),
               color: _type.color,
             ),
             const SizedBox(height: 10),
@@ -226,7 +228,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
               const SizedBox(height: 10),
               _successPill(
                 icon: Icons.wifi_off_rounded,
-                label: 'SMS queued — will send when online',
+                label: l10n.smsQueuedPill,
                 color: kWarning,
               ),
             ],
@@ -237,7 +239,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 context.pop();
               },
               icon: const Icon(Icons.arrow_back_rounded, size: 18),
-              label: const Text('Back to Patient'),
+              label: Text(l10n.backToPatient),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kP3,
                 foregroundColor: Colors.white,
@@ -264,9 +266,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         padding:
         const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.07),
+          color: color.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
@@ -324,7 +326,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() => AppBar(
+  PreferredSizeWidget _buildAppBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return AppBar(
     backgroundColor: kP2,
     foregroundColor: Colors.white,
     elevation: 0,
@@ -332,9 +336,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
       onPressed: () => context.pop(),
     ),
-    title: const Text(
-      'Schedule Follow-up',
-      style: TextStyle(
+    title: Text(
+      l10n.scheduleFollowUpTitle,
+      style: const TextStyle(
           fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
     ),
     flexibleSpace: Container(
@@ -354,6 +358,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     ),
   );
+  }
 
   // ── Patient banner ────────────────────────────────────────────────────────
   Widget _buildPatientBanner() => Container(
@@ -361,10 +366,10 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
     decoration: BoxDecoration(
       color: kCard,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kDanger.withOpacity(0.2)),
+      border: Border.all(color: kDanger.withValues(alpha: 0.2)),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3))
       ],
@@ -377,7 +382,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           height: 44,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
+              colors: [kP1.withValues(alpha: 0.4), kP3.withValues(alpha: 0.3)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -419,9 +424,9 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           padding:
           const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: kDanger.withOpacity(0.09),
+            color: kDanger.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: kDanger.withOpacity(0.35)),
+            border: Border.all(color: kDanger.withValues(alpha: 0.35)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -445,10 +450,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
   );
 
   // ── Follow-up type selector ───────────────────────────────────────────────
-  Widget _buildTypeSelector() => Column(
+  Widget _buildTypeSelector() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _sectionLabel('Follow-up Type'),
+      _sectionLabel(l10n.followUpTypeLabel),
       const SizedBox(height: 10),
       Row(
         children: _FollowUpType.values.map((t) {
@@ -476,13 +483,13 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   boxShadow: selected
                       ? [
                     BoxShadow(
-                        color: t.color.withOpacity(0.25),
+                        color: t.color.withValues(alpha: 0.25),
                         blurRadius: 10,
                         offset: const Offset(0, 4))
                   ]
                       : [
                     BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withValues(alpha: 0.04),
                         blurRadius: 6,
                         offset: const Offset(0, 2))
                   ],
@@ -498,7 +505,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      t.label,
+                      t.localizedLabel(l10n),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -516,12 +523,15 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     ],
   );
+  }
 
   // ── Date & time ───────────────────────────────────────────────────────────
-  Widget _buildDateTimeCard() => Column(
+  Widget _buildDateTimeCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _sectionLabel('Date & Time'),
+      _sectionLabel(l10n.dateTimeLabel),
       const SizedBox(height: 10),
       Container(
         decoration: BoxDecoration(
@@ -529,7 +539,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 3))
           ],
@@ -539,7 +549,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             // Date row
             _pickerRow(
               icon: Icons.calendar_today_rounded,
-              label: 'Date',
+              label: l10n.dateLabel,
               value: _fmtDate(_selectedDate),
               isFirst: true,
               onTap: _pickDate,
@@ -553,7 +563,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             // Time row
             _pickerRow(
               icon: Icons.access_time_rounded,
-              label: 'Time',
+              label: l10n.timeLabel,
               value: _fmtTime(_selectedTime),
               isFirst: false,
               onTap: _pickTime,
@@ -563,6 +573,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     ],
   );
+  }
 
   Widget _pickerRow({
     required IconData icon,
@@ -581,7 +592,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: kP3.withOpacity(0.09),
+                  color: kP3.withValues(alpha: 0.09),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, size: 17, color: kP3),
@@ -613,10 +624,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       );
 
   // ── Notes ─────────────────────────────────────────────────────────────────
-  Widget _buildNotesCard() => Column(
+  Widget _buildNotesCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _sectionLabel('Notes'),
+      _sectionLabel(l10n.notesLabel),
       const SizedBox(height: 10),
       Container(
         decoration: BoxDecoration(
@@ -624,7 +637,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 3))
           ],
@@ -635,8 +648,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           minLines: 4,
           style: const TextStyle(fontSize: 13, height: 1.5),
           decoration: InputDecoration(
-            hintText:
-            'E.g. Patient reported difficulty remembering evening dose.',
+            hintText: l10n.notesHint,
             hintStyle: TextStyle(
                 color: Colors.grey.shade400,
                 fontSize: 13,
@@ -657,27 +669,30 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     ],
   );
+  }
 
   // ── SMS preview ───────────────────────────────────────────────────────────
-  Widget _buildSmsPreview() => Column(
+  Widget _buildSmsPreview() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Row(
         children: [
-          _sectionLabel('SMS Preview'),
+          _sectionLabel(l10n.smsPreview),
           const Spacer(),
           Container(
             padding:
             const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: kP4.withOpacity(0.1),
+              color: kP4.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               children: [
                 Icon(Icons.edit_rounded, size: 10, color: kP4),
                 const SizedBox(width: 4),
-                Text('Editable',
+                Text(l10n.editable,
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -693,10 +708,10 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           color: kCard,
           borderRadius: BorderRadius.circular(14),
           border:
-          Border.all(color: kP4.withOpacity(0.2)),
+          Border.all(color: kP4.withValues(alpha: 0.2)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 3))
           ],
@@ -708,19 +723,19 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
             Container(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
               decoration: BoxDecoration(
-                color: kP4.withOpacity(0.07),
+                color: kP4.withValues(alpha: 0.07),
                 borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(14)),
                 border: Border(
                     bottom: BorderSide(
-                        color: kP4.withOpacity(0.15))),
+                        color: kP4.withValues(alpha: 0.15))),
               ),
               child: Row(
                 children: [
                   Icon(Icons.sms_rounded, size: 14, color: kP4),
                   const SizedBox(width: 7),
                   Text(
-                    'To: $_patientName',
+                    l10n.toRecipient(_patientName),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -729,7 +744,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    '${_smsCtrl.text.length} chars',
+                    l10n.charsCount(_smsCtrl.text.length),
                     style: TextStyle(
                         fontSize: 10, color: Colors.grey.shade400),
                   ),
@@ -774,7 +789,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
           const SizedBox(width: 5),
           Expanded(
             child: Text(
-              'SMS will be queued and sent automatically when a network connection is available.',
+              l10n.smsQueued,
               style: TextStyle(
                   fontSize: 10,
                   color: Colors.grey.shade400,
@@ -785,15 +800,18 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ),
     ],
   );
+  }
 
   // ── Offline banner ────────────────────────────────────────────────────────
-  Widget _buildOfflineBanner() => Container(
+  Widget _buildOfflineBanner() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding:
     const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
     decoration: BoxDecoration(
-      color: kWarning.withOpacity(0.07),
+      color: kWarning.withValues(alpha: 0.07),
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kWarning.withOpacity(0.2)),
+      border: Border.all(color: kWarning.withValues(alpha: 0.2)),
     ),
     child: Row(
       children: [
@@ -801,10 +819,10 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'Follow-up saved locally. Will sync to backend and send SMS when online.',
+            l10n.followUpSavedLocally,
             style: TextStyle(
               fontSize: 11,
-              color: kWarning.withOpacity(0.9),
+              color: kWarning.withValues(alpha: 0.9),
               fontWeight: FontWeight.w600,
               height: 1.4,
             ),
@@ -813,16 +831,19 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       ],
     ),
   );
+  }
 
   // ── Save bar ──────────────────────────────────────────────────────────────
-  Widget _buildSaveBar() => Container(
+  Widget _buildSaveBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: EdgeInsets.fromLTRB(
         16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
     decoration: BoxDecoration(
       color: Colors.white,
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 10,
             offset: const Offset(0, -3))
       ],
@@ -832,7 +853,7 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: kP4,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: kP4.withOpacity(0.6),
+        disabledBackgroundColor: kP4.withValues(alpha: 0.6),
         disabledForegroundColor: Colors.white70,
         minimumSize: const Size(double.infinity, 52),
         shape: RoundedRectangleBorder(
@@ -855,11 +876,12 @@ class _FollowUpScreenState extends State<FollowUpScreen> {
         children: [
           Icon(_type.icon, size: 18),
           const SizedBox(width: 8),
-          const Text('Schedule Follow-up'),
+          Text(l10n.scheduleFollowUpButton),
         ],
       ),
     ),
   );
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   Widget _sectionLabel(String text) => Text(

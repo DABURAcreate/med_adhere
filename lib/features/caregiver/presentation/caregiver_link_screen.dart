@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
+import 'package:provider/provider.dart';
+
+import '../data/caregiver_repository.dart';
+import '../../../providers/session_provider.dart';
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const kP1 = Color(0xFF6AA9CB);
@@ -42,10 +47,10 @@ class CaregiverLinkScreen extends StatefulWidget {
 
 class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
     with SingleTickerProviderStateMixin {
-  // Simulate whether a caregiver is already linked
+  bool _loading = true;
   bool _isLinked = false;
-  String _linkedPhone = '+27831234567';
-  String _linkedRelationship = 'Mother';
+  String _linkedPhone = '';
+  String _linkedRelationship = '';
 
   // Form state
   final _formKey = GlobalKey<FormState>();
@@ -64,9 +69,28 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
-    _fadeAnim = CurvedAnimation(
-        parent: _fadeCtrl, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadCaregiver());
+  }
+
+  Future<void> _loadCaregiver() async {
+    final patientId = context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    final info =
+        await context.read<CaregiverRepository>().getCaregiver(patientId);
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (info != null) {
+        _isLinked = true;
+        _linkedPhone = info.phone;
+        _linkedRelationship = info.relationship;
+      }
+    });
   }
 
   @override
@@ -78,9 +102,10 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
 
   // ── Validation ────────────────────────────────────────────────────────────
   String? _validatePhone(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Phone number is required';
+    final l10n = AppLocalizations.of(context)!;
+    if (v == null || v.trim().isEmpty) return l10n.phoneRequired;
     final digits = v.replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 9) return 'Enter a valid phone number';
+    if (digits.length < 9) return l10n.phoneInvalid;
     return null;
   }
 
@@ -88,26 +113,42 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (!_consentGiven) {
-      _showSnack('Please confirm the caregiver has agreed.', isError: true);
+      _showSnack(AppLocalizations.of(context)!.caregiverConsentRequired, isError: true);
       return;
     }
 
+    final patientId = context.read<SessionProvider>().currentPatientId;
+    if (patientId == null) return;
+
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
 
     final raw = _phoneCtrl.text.trim();
     final normalised = raw.startsWith('0')
         ? '+27${raw.substring(1)}'
         : raw.startsWith('+27')
-        ? raw
-        : '+27$raw';
+            ? raw
+            : '+27$raw';
+    final relationship = _selectedRelationship ?? 'Other';
 
+    try {
+      await context.read<CaregiverRepository>().linkCaregiver(
+            patientId,
+            phone: normalised,
+            relationship: relationship,
+          );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      _showSnack(AppLocalizations.of(context)!.caregiverSaveFailed, isError: true);
+      return;
+    }
+
+    if (!mounted) return;
     setState(() {
       _isSaving = false;
       _isLinked = true;
       _linkedPhone = normalised;
-      _linkedRelationship = _selectedRelationship ?? 'Other';
+      _linkedRelationship = relationship;
       _phoneCtrl.clear();
       _selectedRelationship = null;
       _consentGiven = false;
@@ -118,19 +159,19 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
 
   // ── Remove ────────────────────────────────────────────────────────────────
   void _confirmRemove() {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         shape:
         RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Remove Caregiver?',
-            style: TextStyle(
+        title: Text(l10n.removeCaregiverDialog,
+            style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
                 color: kP2)),
         content: Text(
-          'Removing your caregiver means they will no longer receive '
-              'dose-missed alerts. You can re-link at any time.',
+          l10n.removeCaregiverContent,
           style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade700,
@@ -139,16 +180,30 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
+            child: Text(l10n.cancel,
                 style: TextStyle(
                     color: Colors.grey.shade500,
                     fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              setState(() => _isLinked = false);
-              _showSnack('Caregiver removed.', isError: false);
+              final patientId =
+                  context.read<SessionProvider>().currentPatientId;
+              if (patientId != null) {
+                try {
+                  await context
+                      .read<CaregiverRepository>()
+                      .unlinkCaregiver(patientId);
+                } catch (_) {}
+              }
+              if (!mounted) return;
+              setState(() {
+                _isLinked = false;
+                _linkedPhone = '';
+                _linkedRelationship = '';
+              });
+              _showSnack(AppLocalizations.of(context)!.caregiverRemoved, isError: false);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: kDanger,
@@ -157,8 +212,8 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                   borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text('Remove',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(l10n.remove,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -179,6 +234,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
 
   // ── Success bottom sheet ──────────────────────────────────────────────────
   void _showSuccessSheet() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -199,24 +255,23 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
               width: 68,
               height: 68,
               decoration: BoxDecoration(
-                color: kSuccess.withOpacity(0.1),
+                color: kSuccess.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.people_rounded,
                   size: 34, color: kSuccess),
             ),
             const SizedBox(height: 14),
-            const Text(
-              'Caregiver Linked!',
-              style: TextStyle(
+            Text(
+              l10n.caregiverLinkedSuccess,
+              style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
                   color: kP2),
             ),
             const SizedBox(height: 6),
             Text(
-              'They will receive a dose-missed alert only.\n'
-                  'No medication or diagnosis details will be shared.',
+              l10n.caregiverLinkedSubtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 12,
@@ -239,14 +294,14 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
             const SizedBox(height: 8),
             _linkedInfoPill(
               icon: Icons.lock_rounded,
-              label: 'Dose-missed alerts only — privacy protected',
+              label: l10n.privacyProtected,
               color: kSuccess,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
               icon: const Icon(Icons.check_rounded, size: 18),
-              label: const Text('Done'),
+              label: Text(l10n.done),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kP3,
                 foregroundColor: Colors.white,
@@ -273,9 +328,9 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
         padding:
         const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.07),
+          color: color.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
@@ -298,25 +353,29 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
     return Scaffold(
       backgroundColor: kBg,
       appBar: _buildAppBar(),
-      body: FadeTransition(
-        opacity: _fadeAnim,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildExplanationCard(),
-              const SizedBox(height: 20),
-              _isLinked ? _buildLinkedCard() : _buildLinkForm(),
-            ],
-          ),
-        ),
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : FadeTransition(
+              opacity: _fadeAnim,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildExplanationCard(),
+                    const SizedBox(height: 20),
+                    _isLinked ? _buildLinkedCard() : _buildLinkForm(),
+                  ],
+                ),
+              ),
+            ),
     );
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() => AppBar(
+  PreferredSizeWidget _buildAppBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return AppBar(
     backgroundColor: kP2,
     foregroundColor: Colors.white,
     elevation: 0,
@@ -324,8 +383,8 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
       onPressed: () => context.pop(),
     ),
-    title: const Text(
-      'Caregiver',
+    title: Text(
+      l10n.caregiverTitle,
       style: TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w800,
@@ -348,16 +407,19 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       ),
     ),
   );
+  }
 
   // ── Explanation card ──────────────────────────────────────────────────────
-  Widget _buildExplanationCard() => Container(
+  Widget _buildExplanationCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
       color: kCard,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4))
       ],
@@ -370,7 +432,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
           height: 48,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [kP4.withOpacity(0.2), kP3.withOpacity(0.15)],
+              colors: [kP4.withValues(alpha: 0.2), kP3.withValues(alpha: 0.15)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -384,17 +446,16 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'What is a caregiver?',
-                style: TextStyle(
+              Text(
+                l10n.whatIsCaregiver,
+                style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
                     color: kP2),
               ),
               const SizedBox(height: 6),
               Text(
-                'A caregiver will receive an alert when you miss a dose. '
-                    'They will not see your medication details or diagnosis.',
+                l10n.caregiverDescription,
                 style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
@@ -408,15 +469,15 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                 children: [
                   _privacyChip(
                       Icons.notifications_active_rounded,
-                      'Missed dose alert',
+                      l10n.missedDoseAlert,
                       kSuccess),
                   _privacyChip(
                       Icons.do_not_disturb_rounded,
-                      'No medication names',
+                      l10n.noMedicationNames,
                       kDanger),
                   _privacyChip(
                       Icons.health_and_safety_rounded,
-                      'No diagnosis',
+                      l10n.noDiagnosis,
                       kDanger),
                 ],
               ),
@@ -426,14 +487,15 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       ],
     ),
   );
+  }
 
   Widget _privacyChip(IconData icon, String label, Color color) =>
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.25)),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -450,17 +512,19 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       );
 
   // ── Already linked card ───────────────────────────────────────────────────
-  Widget _buildLinkedCard() => Column(
+  Widget _buildLinkedCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     children: [
       Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: kCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kSuccess.withOpacity(0.3)),
+          border: Border.all(color: kSuccess.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4))
           ],
@@ -475,16 +539,16 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: kSuccess.withOpacity(0.1),
+                    color: kSuccess.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.check_circle_rounded,
                       color: kSuccess, size: 20),
                 ),
                 const SizedBox(width: 10),
-                const Text(
-                  'Caregiver Linked',
-                  style: TextStyle(
+                Text(
+                  l10n.caregiverLinkedTitle,
+                  style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                       color: kP2),
@@ -494,10 +558,10 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: kSuccess.withOpacity(0.1),
+                    color: kSuccess.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text('Active',
+                  child: Text(l10n.activeStatus,
                       style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
@@ -512,20 +576,20 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
             // Phone (masked)
             _detailRow(
               icon: Icons.phone_rounded,
-              label: 'Phone',
+              label: l10n.phoneLabel,
               value: _maskPhone(_linkedPhone),
             ),
             const SizedBox(height: 10),
             _detailRow(
               icon: Icons.people_alt_rounded,
-              label: 'Relationship',
+              label: l10n.relationshipLabel,
               value: _linkedRelationship,
             ),
             const SizedBox(height: 10),
             _detailRow(
               icon: Icons.notifications_active_rounded,
-              label: 'Alert type',
-              value: 'Dose-missed only',
+              label: l10n.alertTypeLabel,
+              value: l10n.dosesMissedOnly,
             ),
             const SizedBox(height: 18),
 
@@ -533,9 +597,9 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: kP4.withOpacity(0.06),
+                color: kP4.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kP4.withOpacity(0.18)),
+                border: Border.all(color: kP4.withValues(alpha: 0.18)),
               ),
               child: Row(
                 children: [
@@ -543,8 +607,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Your medication details and diagnosis remain private. '
-                          'Your caregiver only knows when a dose is missed.',
+                      l10n.privacyNote,
                       style: TextStyle(
                           fontSize: 11,
                           color: Colors.grey.shade600,
@@ -563,10 +626,10 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       OutlinedButton.icon(
         onPressed: _confirmRemove,
         icon: const Icon(Icons.person_remove_rounded, size: 18),
-        label: const Text('Remove Caregiver'),
+        label: Text(l10n.removeCaregiverButton),
         style: OutlinedButton.styleFrom(
           foregroundColor: kDanger,
-          side: BorderSide(color: kDanger.withOpacity(0.6), width: 1.5),
+          side: BorderSide(color: kDanger.withValues(alpha: 0.6), width: 1.5),
           minimumSize: const Size(double.infinity, 50),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12)),
@@ -576,6 +639,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       ),
     ],
   );
+  }
 
   Widget _detailRow({
     required IconData icon,
@@ -588,7 +652,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: kP3.withOpacity(0.08),
+              color: kP3.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(7),
             ),
             child: Icon(icon, size: 14, color: kP3),
@@ -613,13 +677,15 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       );
 
   // ── Link form ─────────────────────────────────────────────────────────────
-  Widget _buildLinkForm() => Form(
+  Widget _buildLinkForm() {
+    final l10n = AppLocalizations.of(context)!;
+    return Form(
     key: _formKey,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Phone field
-        _fieldLabel('Caregiver Phone Number *'),
+        _fieldLabel(l10n.caregiverPhoneField),
         const SizedBox(height: 8),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,9 +695,9 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
               height: 54,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: kP2.withOpacity(0.07),
+                color: kP2.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kP2.withOpacity(0.15)),
+                border: Border.all(color: kP2.withValues(alpha: 0.15)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -703,21 +769,22 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          'Enter the caregiver\'s South African mobile number.',
+          l10n.caregiverPhoneHint,
           style: TextStyle(
               fontSize: 10, color: Colors.grey.shade500),
         ),
         const SizedBox(height: 18),
 
         // Relationship dropdown
-        _fieldLabel('Relationship *'),
+        _fieldLabel(l10n.relationshipField),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
+          // ignore: deprecated_member_use
           value: _selectedRelationship,
           decoration: InputDecoration(
             prefixIcon: Icon(Icons.people_alt_rounded,
                 color: kP4, size: 20),
-            hintText: 'Select relationship…',
+            hintText: l10n.selectRelationship,
             hintStyle: TextStyle(
                 color: Colors.grey.shade400, fontSize: 13),
             filled: true,
@@ -757,7 +824,7 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
           onChanged: (v) =>
               setState(() => _selectedRelationship = v),
           validator: (v) =>
-          v == null ? 'Please select a relationship' : null,
+          v == null ? l10n.selectRelationshipRequired : null,
         ),
         const SizedBox(height: 24),
 
@@ -777,11 +844,11 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
                   valueColor: AlwaysStoppedAnimation(
                       Colors.white)))
               : const Icon(Icons.person_add_rounded, size: 18),
-          label: Text(_isSaving ? 'Linking…' : 'Link Caregiver'),
+          label: Text(_isSaving ? l10n.linking : l10n.linkCaregiver),
           style: ElevatedButton.styleFrom(
             backgroundColor: kP4,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: kP4.withOpacity(0.55),
+            disabledBackgroundColor: kP4.withValues(alpha: 0.55),
             disabledForegroundColor: Colors.white70,
             minimumSize: const Size(double.infinity, 52),
             shape: RoundedRectangleBorder(
@@ -794,8 +861,11 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       ],
     ),
   );
+  }
 
-  Widget _buildConsentBox() => GestureDetector(
+  Widget _buildConsentBox() {
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
     onTap: () =>
         setState(() => _consentGiven = !_consentGiven),
     child: AnimatedContainer(
@@ -803,12 +873,12 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: _consentGiven
-            ? kSuccess.withOpacity(0.05)
+            ? kSuccess.withValues(alpha: 0.05)
             : kCard,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: _consentGiven
-              ? kSuccess.withOpacity(0.4)
+              ? kSuccess.withValues(alpha: 0.4)
               : Colors.grey.shade300,
           width: _consentGiven ? 1.5 : 1,
         ),
@@ -838,34 +908,20 @@ class _CaregiverLinkScreenState extends State<CaregiverLinkScreen>
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade700,
-                    height: 1.55),
-                children: [
-                  const TextSpan(
-                      text: 'I confirm the caregiver has agreed ',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w500)),
-                  TextSpan(
-                    text: 'to receive dose-missed alerts',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: kP2),
-                  ),
-                  const TextSpan(
-                      text:
-                      ' for this patient. They will not be sent any medication or diagnosis details.'),
-                ],
-              ),
+            child: Text(
+              l10n.consentText,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade700,
+                  height: 1.55,
+                  fontWeight: FontWeight.w500),
             ),
           ),
         ],
       ),
     ),
   );
+  }
 
   Widget _fieldLabel(String text) => Text(
     text,

@@ -1,10 +1,486 @@
 {
   "@@locale": "en",
+
   "enterYourPin": "Enter Your Pin:",
   "enterRegistrationCode": "Enter Registration Code",
   "continueButton": "Continue",
   "navHome": "HOME",
   "navProgress": "PROGRESS",
   "navMeds": "MEDS",
-  "navRiskLevel": "RISK LEVEL"
+  "navRiskLevel": "RISK LEVEL",
+
+  "cancel": "Cancel",
+  "save": "Save",
+  "done": "Done",
+  "back": "Back",
+  "edit": "Edit",
+  "remove": "Remove",
+  "send": "Send",
+  "logout": "Logout",
+  "never": "Never",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "daysAgo": "{count} days ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "taken": "Taken",
+  "missed": "Missed",
+  "pending": "Pending",
+  "loading": "Loading…",
+  "required": "Required",
+  "medications": "Medications",
+  "inactive": "INACTIVE",
+  "active": "Active",
+  "highRisk": "High Risk",
+  "medRisk": "Med Risk",
+  "lowRisk": "Low Risk",
+  "pinMismatch": "PINs do not match. Please try again.",
+  "pinTooShort": "Please enter a 4-digit PIN.",
+  "fullNameLabel": "Full Name *",
+  "fullNameRequired": "Full name is required",
+  "noData": "No data",
+  "noActiveMedications": "No active medications found.",
+  "next": "Next",
+
+  "loginNewPatient": "New patient? Enter your activation code",
+  "loginWorkerRegister": "Register as Healthcare Worker",
+
+  "createPin": "Create PIN:",
+  "confirmPinLabel": "Confirm PIN:",
+
+  "languageLabel": "Language:",
+  "languageAlreadyRegistered": "Already registered? Sign in",
+
+  "registerWorkerTitle": "Register as Worker",
+  "staffDetails": "Staff Details",
+  "staffNumberLabel": "Staff Number *",
+  "clinicNameOptional": "Clinic Name (optional)",
+  "setYourPin": "Set Your PIN",
+  "pinSubtitle": "Choose a 4-digit PIN you will use to log in.",
+  "pinLabel": "PIN",
+  "confirmPinField": "Confirm PIN",
+  "registerSignIn": "Register & Sign In",
+  "staffNumberRequired": "Staff number is required",
+
+  "noPatientSession": "No patient session found. Please log in again.",
+  "todaysDoses": "Today's Doses",
+  "patientNotFound": "Patient not found. Please log in again.",
+  "todayProgress": "Today progress:",
+  "greetingHi": "Hi, {name} 👋",
+  "@greetingHi": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+
+  "noPatientSessionShort": "No patient session found.",
+  "noMedicationsAssigned": "No medications assigned yet.",
+  "dosageLabel": "Dosage: {dosage}",
+  "@dosageLabel": {
+    "placeholders": {
+      "dosage": { "type": "String" }
+    }
+  },
+  "yourSchedule": "Your Schedule:",
+  "noScheduledTimes": "No scheduled times yet.",
+  "howToTake": "How to Take:",
+
+  "riskLevel": "Risk Level",
+  "noActiveSession": "No active session.\nPlease log in first.",
+  "riskScore": "Score: {score}/100",
+  "@riskScore": {
+    "placeholders": {
+      "score": { "type": "int" }
+    }
+  },
+  "thirtyDayAdherence": "30-day adherence",
+  "currentStreak": "Current streak",
+  "missedLast7Days": "Missed (last 7 days)",
+  "whyThisRating": "Why this rating?",
+  "whatShouldIDo": "What should I do?",
+  "recalculate": "Recalculate",
+  "lastCalculated": "Last calculated: {time}",
+  "@lastCalculated": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+
+  "myProgress": "My Progress",
+  "legendPartial": "Partial",
+  "streakDays": "{n}-day streak",
+  "@streakDays": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "noStreak": "No Streak",
+  "noDosesLogged": "No doses logged.",
+  "doseLoggedAt": "Taken {time}",
+  "@doseLoggedAt": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "doseMissedAt": "Missed ({scheduledAt})",
+  "@doseMissedAt": {
+    "placeholders": {
+      "scheduledAt": { "type": "String" }
+    }
+  },
+  "thisMonth": "This month",
+  "monthlyDosesSummary": "You took {taken} of {scheduled} scheduled doses.",
+  "@monthlyDosesSummary": {
+    "placeholders": {
+      "taken": { "type": "int" },
+      "scheduled": { "type": "int" }
+    }
+  },
+  "previousMonth": "Previous Month",
+
+  "greeting": "Hi, {name}",
+  "@greeting": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "syncing": "Syncing…",
+  "syncedAt": "Synced {time}",
+  "@syncedAt": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "totalPatients": "Total Patients",
+  "avgAdherence": "Avg Adherence",
+  "actionRequired": "Action Required",
+  "viewAll": "View all",
+  "noHighRiskPatients": "No high-risk patients — great work!",
+  "lastSeen": "Last seen: {time}",
+  "@lastSeen": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "adherence": "adherence",
+  "riskBadge": "Risk {score}%",
+  "@riskBadge": {
+    "placeholders": {
+      "score": { "type": "String" }
+    }
+  },
+  "clinicAdherenceTrend": "Clinic Adherence Trend",
+  "thirtyDays": "30 days",
+  "clinicWideAdherence": "Clinic-wide medication adherence %",
+  "loadingTrend": "Loading trend…",
+  "navDashboard": "Dashboard",
+  "navPatients": "Patients",
+  "navReports": "Reports",
+  "navSettings": "Settings",
+
+  "patientList": "Patient List",
+  "searchByNameOrCode": "Search by name or clinic code…",
+  "filterAll": "All",
+  "sortBy": "Sort by",
+  "sortRiskLevel": "Risk Level",
+  "sortName": "Name",
+  "sortLastActive": "Last Active",
+  "adherence30d": "adherence (30d)",
+  "noPatientsFound": "No patients found",
+  "noPatientsFoundSubtitle": "Try adjusting your search or filter, or register a new patient.",
+  "registerNewPatient": "Register New Patient",
+  "patientCount": "{count, plural, one{1 patient} other{{count} patients}}",
+  "@patientCount": {
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+
+  "registerPatient": "Register Patient",
+  "stepPatientInfo": "Patient\nInfo",
+  "stepConfirm": "Confirm",
+  "patientInformationTitle": "Patient Information",
+  "patientInformationSubtitle": "Enter the patient's basic details as recorded at the clinic.",
+  "clinicPatientCodeLabel": "Clinic Patient Code *",
+  "codeAutoGenerated": "Auto-generated — edit if needed",
+  "conditionsLabel": "Condition(s) *",
+  "conditionsHint": "Select all that apply",
+  "caregiverPhoneOptional": "Caregiver Phone Number (optional)",
+  "patientCodeRequired": "Patient code is required",
+  "secureStorageInfo": "Full name and ID are stored securely on the backend only. The local device stores only the clinic patient code.",
+  "medicationsSubtitle": "Add all medications the patient must take.",
+  "medicationCard": "Medication {n}",
+  "@medicationCard": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "medicationNameLabel": "Medication Name *",
+  "dosageFieldLabel": "Dosage *",
+  "timesPerDayField": "Times per day *",
+  "medicationNameRequired": "Medication name is required",
+  "dosageRequired": "Dosage is required",
+  "addAnotherMedication": "+ Add Another Medication",
+  "remindersTitle": "Set Reminder Times",
+  "remindersSubtitle": "Set daily reminder times for each medication. These are set on behalf of the patient.",
+  "timesDaily": "{n}× daily",
+  "@timesDaily": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "doseLabel": "Dose {n}",
+  "@doseLabel": {
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "remindersInfo": "Reminder times are set by the worker on behalf of the patient. The patient can adjust these after activating their account.",
+  "confirmRegistrationTitle": "Confirm Registration",
+  "confirmRegistrationSubtitle": "Review all details before registering the patient.",
+  "summaryPatientInformation": "Patient Information",
+  "summaryClinicCode": "Clinic Code",
+  "summaryConditions": "Conditions",
+  "summaryCaregiverPhone": "Caregiver Phone",
+  "summaryFullName": "Full Name",
+  "patientActivationCode": "Patient Activation Code",
+  "activationCodeHint": "Give this code to the patient to activate their account",
+  "copyCode": "Copy Code",
+  "patientRegistered": "Patient Registered!",
+  "patientRegisteredSuccess": "{name} has been registered successfully.",
+  "@patientRegisteredSuccess": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "patientActivationCodeLabel": "PATIENT ACTIVATION CODE",
+  "activationCodeShare": "Share this 5-digit code with the patient.\nThey will use it to set their PIN and activate their account.",
+  "registerPatientButton": "Register Patient",
+  "conditionRequired": "Please select at least one condition.",
+  "registrationFailed": "Registration failed: {error}",
+  "@registrationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "codeCopied": "Code copied to clipboard",
+  "activationCodeCopied": "Activation code copied",
+
+  "patientNotFoundError": "Patient not found.",
+  "couldNotLoadPatient": "Could not load patient data: {error}",
+  "@couldNotLoadPatient": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "adherenceSummary": "Adherence Summary",
+  "thirtyDayAdherenceRate": "30-day adherence rate",
+  "missedDosesLabel": "missed\ndoses",
+  "last14Days": "Last 14 Days",
+  "workerBadge": "WORKER",
+  "whyThisRiskLevel": "Why this risk level?",
+  "actionsTitle": "Actions",
+  "scheduleFollowUp": "Schedule Follow-up",
+  "sendSmsReminder": "Send SMS Reminder",
+  "editMedicationSchedule": "Edit Medication Schedule",
+  "manageCaregiver": "Manage Caregiver",
+  "sendSmsDialogContent": "Send a medication reminder SMS to {name}?",
+  "@sendSmsDialogContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "smsSent": "SMS sent to {name}",
+  "@smsSent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "followUpLog": "Follow-up Log",
+  "noFollowUpNotes": "No follow-up notes yet.",
+  "noMedicationsScheduled": "No medications scheduled.",
+
+  "medicationScheduleTitle": "Medication Schedule",
+  "unsavedChanges": "Unsaved Changes",
+  "leaveWithoutSaving": "You have unsaved changes. Leave without saving?",
+  "keepEditing": "Keep Editing",
+  "discard": "Discard",
+  "futureDosesOnly": "Changes apply to future doses only and will not affect logged history.",
+  "medsCount": "{count} meds",
+  "@medsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "removeMedication": "Remove Medication?",
+  "removeMedicationContent": "Remove {name} from this patient's schedule? Past logs will not be affected.",
+  "@removeMedicationContent": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "saveChangesQuestion": "Save Changes?",
+  "saveChangesContent": "Changes will apply to future doses only. Past medication logs will not be affected.",
+  "scheduleSaved": "Schedule saved successfully",
+  "saveFailed": "Save failed: {error}",
+  "@saveFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "timesPerDay": "Times per day",
+  "reminderTimesLabel": "Reminder times",
+  "activeLabel": "Active",
+  "inactiveLabel": "Inactive",
+  "patientReceivesReminders": "Patient receives reminders for this medication",
+  "noRemindersSent": "No reminders sent — medication paused",
+  "addMedication": "+ Add Medication",
+  "noMedicationsYet": "No medications yet",
+  "addFirstMedication": "Tap below to add the first medication for this patient.",
+  "saveChanges": "Save Changes",
+  "noChanges": "No Changes",
+
+  "scheduleFollowUpTitle": "Schedule Follow-up",
+  "followUpTypeLabel": "Follow-up Type",
+  "dateTimeLabel": "Date & Time",
+  "dateLabel": "Date",
+  "timeLabel": "Time",
+  "notesLabel": "Notes",
+  "smsPreview": "SMS Preview",
+  "editable": "Editable",
+  "toRecipient": "To: {name}",
+  "@toRecipient": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "charsCount": "{count} chars",
+  "@charsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "smsQueued": "SMS will be queued and sent automatically when a network connection is available.",
+  "followUpSavedLocally": "Follow-up saved locally. Will sync to backend and send SMS when online.",
+  "followUpScheduled": "Follow-up Scheduled",
+  "savedLocally": "Saved locally and will sync when online.",
+  "smsQueuedPill": "SMS queued — will send when online",
+  "backToPatient": "Back to Patient",
+  "scheduleFollowUpButton": "Schedule Follow-up",
+  "followUpCall": "Call",
+  "followUpVisit": "Visit",
+  "followUpSms": "SMS",
+  "notesHint": "E.g. Patient reported difficulty remembering evening dose.",
+
+  "reminderSettingsTitle": "Reminder Settings",
+  "noActiveMedicationsTitle": "No active medications",
+  "noActiveMedicationsSubtitle": "Your healthcare worker will assign medications to your account. They will appear here once added.",
+  "remindersOn": "{active} of {total} reminder(s) on",
+  "@remindersOn": {
+    "placeholders": {
+      "active": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "addReminderTime": "Add reminder time",
+  "reminderFrequencyNote": "Your healthcare worker may adjust your reminder frequency based on your adherence.",
+  "remindersSaved": "Reminders saved",
+  "removeReminderTooltip": "Remove reminder",
+
+  "reports": "Reports",
+  "reportType": "Report Type",
+  "perPatient": "Per Patient",
+  "perClinic": "Per Clinic",
+  "perPatientSubtitle": "Individual adherence\nby date range",
+  "perClinicSubtitle": "All patients overview\nby date range",
+  "selected": "Selected",
+  "tapToSelect": "Tap to select",
+  "patientLabel": "Patient",
+  "noPatientsFoundHint": "No patients found",
+  "selectPatient": "Select a patient…",
+  "clinicLabel": "Clinic",
+  "autoLabel": "Auto",
+  "dateRange": "Date Range",
+  "daysCount": "{count} days",
+  "@daysCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "exportFormat": "Export Format",
+  "previewReportData": "Preview Report Data",
+  "previewLabel": "Preview",
+  "rowsCount": "{count} rows",
+  "@rowsCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "statAvg": "Avg",
+  "columnDate": "Date",
+  "columnMedication": "Medication",
+  "columnPatient": "Patient",
+  "columnAdherence": "Adh. %",
+  "previewNote": "Preview shows data from local storage. Sync for the latest cloud data.",
+  "noDataForRange": "No data for this range",
+  "noDataSubtitle": "No adherence records were found for the selected\npatient and date range. Try widening your selection.",
+  "exportPDF": "Export PDF Report",
+  "exportCSV": "Export CSV Report",
+  "previewAndExport": "Preview & Export",
+  "pleaseSelectPatient": "Please select a patient first.",
+  "errorLoadingReport": "Error loading report: {error}",
+  "@errorLoadingReport": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+
+  "caregiverTitle": "Caregiver",
+  "whatIsCaregiver": "What is a caregiver?",
+  "caregiverDescription": "A caregiver will receive an alert when you miss a dose. They will not see your medication details or diagnosis.",
+  "missedDoseAlert": "Missed dose alert",
+  "noMedicationNames": "No medication names",
+  "noDiagnosis": "No diagnosis",
+  "caregiverLinkedTitle": "Caregiver Linked",
+  "activeStatus": "Active",
+  "phoneLabel": "Phone",
+  "relationshipLabel": "Relationship",
+  "alertTypeLabel": "Alert type",
+  "dosesMissedOnly": "Dose-missed only",
+  "privacyNote": "Your medication details and diagnosis remain private. Your caregiver only knows when a dose is missed.",
+  "removeCaregiverButton": "Remove Caregiver",
+  "caregiverPhoneField": "Caregiver Phone Number *",
+  "caregiverPhoneHint": "Enter the caregiver's South African mobile number.",
+  "relationshipField": "Relationship *",
+  "selectRelationship": "Select relationship…",
+  "consentText": "I confirm the caregiver has agreed to receive dose-missed alerts for this patient. They will not be sent any medication or diagnosis details.",
+  "linkCaregiver": "Link Caregiver",
+  "linking": "Linking…",
+  "removeCaregiverDialog": "Remove Caregiver?",
+  "removeCaregiverContent": "Removing your caregiver means they will no longer receive dose-missed alerts. You can re-link at any time.",
+  "phoneRequired": "Phone number is required",
+  "phoneInvalid": "Enter a valid phone number",
+  "caregiverConsentRequired": "Please confirm the caregiver has agreed.",
+  "selectRelationshipRequired": "Please select a relationship",
+  "caregiverSaveFailed": "Failed to save. Please try again.",
+  "caregiverRemoved": "Caregiver removed.",
+  "caregiverLinkedSuccess": "Caregiver Linked!",
+  "caregiverLinkedSubtitle": "They will receive a dose-missed alert only.\nNo medication or diagnosis details will be shared.",
+  "privacyProtected": "Dose-missed alerts only — privacy protected",
+
+  "navWorkerHome": "HOME",
+  "navWorkerPatients": "PATIENTS",
+  "navWorkerReports": "REPORTS",
+  "navWorkerRegister": "REGISTER",
+
+  "scheduledLabel": "Scheduled: ",
+  "loggedAtLabel": "Logged at: ",
+  "takenButton": "TAKEN",
+  "missedButton": "MISSED",
+  "statusOverdue": "Overdue",
+
+  "logoutTooltip": "Logout"
 }

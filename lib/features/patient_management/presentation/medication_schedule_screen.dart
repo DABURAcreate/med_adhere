@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../data/patient_mgmt_repository.dart';
@@ -98,8 +99,8 @@ class _MedicationScheduleScreenState
 
   @override
   void dispose() {
-    for (final c in _nameCtrl.values) c.dispose();
-    for (final c in _doseCtrl.values) c.dispose();
+    for (final c in _nameCtrl.values) { c.dispose(); }
+    for (final c in _doseCtrl.values) { c.dispose(); }
     super.dispose();
   }
 
@@ -175,6 +176,7 @@ class _MedicationScheduleScreenState
 
   // ── Add medication (bottom sheet) ─────────────────────────────────────────
   void _showAddSheet() {
+    final l10n = AppLocalizations.of(context)!;
     final nameCtrl = TextEditingController();
     final doseCtrl = TextEditingController();
     int times = 1;
@@ -217,15 +219,15 @@ class _MedicationScheduleScreenState
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: kP4.withOpacity(0.1),
+                          color: kP4.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(Icons.add_rounded, color: kP4, size: 20),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'Add Medication',
-                        style: TextStyle(
+                      Text(
+                        l10n.addMedication,
+                        style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w900,
                             color: kP2),
@@ -233,7 +235,7 @@ class _MedicationScheduleScreenState
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _sheetFieldLabel('Medication Name *'),
+                  _sheetFieldLabel(l10n.medicationNameLabel),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: nameCtrl,
@@ -243,10 +245,10 @@ class _MedicationScheduleScreenState
                         hint: 'e.g. Isoniazid',
                         icon: Icons.medication_liquid_rounded),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? l10n.required : null,
                   ),
                   const SizedBox(height: 14),
-                  _sheetFieldLabel('Dosage *'),
+                  _sheetFieldLabel(l10n.dosageFieldLabel),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: doseCtrl,
@@ -254,10 +256,10 @@ class _MedicationScheduleScreenState
                     decoration: _inputDec(
                         hint: 'e.g. 300 mg', icon: Icons.scale_rounded),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? l10n.required : null,
                   ),
                   const SizedBox(height: 14),
-                  _sheetFieldLabel('Times per day'),
+                  _sheetFieldLabel(l10n.timesPerDay),
                   const SizedBox(height: 8),
                   Row(
                     children: [1, 2, 3, 4].map((n) {
@@ -276,7 +278,7 @@ class _MedicationScheduleScreenState
                                   color: sel ? kP3 : Colors.grey.shade300),
                             ),
                             child: Text(
-                              '${n}×',
+                              '×',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,
@@ -312,7 +314,7 @@ class _MedicationScheduleScreenState
                       Navigator.pop(context);
                     },
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Add Medication'),
+                    label: Text(l10n.addMedication),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kP3,
                       foregroundColor: Colors.white,
@@ -335,34 +337,23 @@ class _MedicationScheduleScreenState
 
   // ── Remove confirm ────────────────────────────────────────────────────────
   Future<bool> _confirmRemove(_MedEntry med) async {
+    final l10n = AppLocalizations.of(context)!;
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Remove Medication?',
-            style: TextStyle(
+        title: Text(l10n.removeMedication,
+            style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
-        content: RichText(
-          text: TextSpan(
-            style: TextStyle(
-                fontSize: 13, color: Colors.grey.shade700, height: 1.5),
-            children: [
-              const TextSpan(text: 'Remove '),
-              TextSpan(
-                text: med.name,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, color: kP2),
-              ),
-              const TextSpan(
-                  text:
-                      ' from this patient\'s schedule? Past logs will not be affected.'),
-            ],
-          ),
+        content: Text(
+          l10n.removeMedicationContent(med.name),
+          style: TextStyle(
+              fontSize: 13, color: Colors.grey.shade700, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
+            child: Text(l10n.cancel,
                 style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
@@ -374,8 +365,8 @@ class _MedicationScheduleScreenState
                   borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text('Remove',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(l10n.remove,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -385,6 +376,7 @@ class _MedicationScheduleScreenState
 
   // ── Save ──────────────────────────────────────────────────────────────────
   void _save() {
+    final l10n = AppLocalizations.of(context)!;
     // Flush controller values back into models
     for (final m in _meds) {
       m.name = _nameCtrl[m.id]?.text.trim() ?? m.name;
@@ -396,18 +388,18 @@ class _MedicationScheduleScreenState
       barrierDismissible: false,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Save Changes?',
-            style: TextStyle(
+        title: Text(l10n.saveChangesQuestion,
+            style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
         content: Text(
-          'Changes will apply to future doses only. Past medication logs will not be affected.',
+          l10n.saveChangesContent,
           style: TextStyle(
               fontSize: 13, color: Colors.grey.shade700, height: 1.5),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
+            child: Text(l10n.cancel,
                 style: TextStyle(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
@@ -422,8 +414,8 @@ class _MedicationScheduleScreenState
                   borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: const Text('Save',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text(l10n.save,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -463,8 +455,9 @@ class _MedicationScheduleScreenState
         _originalDbIds.clear();
         _originalDbIds.addAll(currentDbIds);
       });
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Schedule saved successfully'),
+        content: Text(l10n.scheduleSaved),
         backgroundColor: kSuccess,
         behavior: SnackBarBehavior.floating,
         shape:
@@ -473,8 +466,9 @@ class _MedicationScheduleScreenState
       context.pop();
     } catch (e) {
       if (!mounted) return;
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Save failed: $e'),
+        content: Text(l10n.saveFailed(e.toString())),
         backgroundColor: kDanger,
         behavior: SnackBarBehavior.floating,
       ));
@@ -518,7 +512,9 @@ class _MedicationScheduleScreenState
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() => AppBar(
+  PreferredSizeWidget _buildAppBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return AppBar(
         backgroundColor: kP2,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -532,9 +528,9 @@ class _MedicationScheduleScreenState
             }
           },
         ),
-        title: const Text(
-          'Medication Schedule',
-          style: TextStyle(
+        title: Text(
+          l10n.medicationScheduleTitle,
+          style: const TextStyle(
               fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
         ),
         flexibleSpace: Container(
@@ -554,23 +550,25 @@ class _MedicationScheduleScreenState
           ),
         ),
       );
+  }
 
   void _showUnsavedDialog() {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Unsaved Changes',
-            style: TextStyle(
+        title: Text(l10n.unsavedChanges,
+            style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w900, color: kP2)),
-        content: Text('You have unsaved changes. Leave without saving?',
+        content: Text(l10n.leaveWithoutSaving,
             style: TextStyle(
                 fontSize: 13, color: Colors.grey.shade700, height: 1.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Keep Editing',
-                style: TextStyle(color: kP3, fontWeight: FontWeight.w700)),
+            child: Text(l10n.keepEditing,
+                style: const TextStyle(color: kP3, fontWeight: FontWeight.w700)),
           ),
           TextButton(
             onPressed: () {
@@ -578,7 +576,7 @@ class _MedicationScheduleScreenState
               context.pop();
             },
             child:
-                Text('Discard', style: TextStyle(color: Colors.grey.shade500)),
+                Text(l10n.discard, style: TextStyle(color: Colors.grey.shade500)),
           ),
         ],
       ),
@@ -586,7 +584,9 @@ class _MedicationScheduleScreenState
   }
 
   // ── Patient header ────────────────────────────────────────────────────────
-  Widget _buildPatientHeader() => Container(
+  Widget _buildPatientHeader() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
         color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(
@@ -596,7 +596,7 @@ class _MedicationScheduleScreenState
               height: 42,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [kP1.withOpacity(0.4), kP3.withOpacity(0.3)],
+                  colors: [kP1.withValues(alpha: 0.4), kP3.withValues(alpha: 0.3)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -635,9 +635,9 @@ class _MedicationScheduleScreenState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: kP4.withOpacity(0.08),
+                color: kP4.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: kP4.withOpacity(0.2)),
+                border: Border.all(color: kP4.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -645,7 +645,7 @@ class _MedicationScheduleScreenState
                   Icon(Icons.medication_rounded, size: 13, color: kP4),
                   const SizedBox(width: 5),
                   Text(
-                    '${_meds.length} meds',
+                    l10n.medsCount(_meds.length),
                     style: TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w700, color: kP4),
                   ),
@@ -655,11 +655,14 @@ class _MedicationScheduleScreenState
           ],
         ),
       );
+  }
 
   // ── Change banner ─────────────────────────────────────────────────────────
-  Widget _buildChangeBanner() => Container(
+  Widget _buildChangeBanner() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
         width: double.infinity,
-        color: kWarning.withOpacity(0.08),
+        color: kWarning.withValues(alpha: 0.08),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(
           children: [
@@ -667,10 +670,10 @@ class _MedicationScheduleScreenState
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Changes apply to future doses only and will not affect logged history.',
+                l10n.futureDosesOnly,
                 style: TextStyle(
                   fontSize: 11,
-                  color: kWarning.withOpacity(0.9),
+                  color: kWarning.withValues(alpha: 0.9),
                   fontWeight: FontWeight.w600,
                   height: 1.4,
                 ),
@@ -679,9 +682,11 @@ class _MedicationScheduleScreenState
           ],
         ),
       );
+  }
 
   // ── Med tile (swipe-to-remove + expandable) ───────────────────────────────
   Widget _buildMedTile(_MedEntry med) {
+    final l10n = AppLocalizations.of(context)!;
     return Dismissible(
       key: ValueKey(med.id),
       direction: DismissDirection.endToStart,
@@ -702,13 +707,13 @@ class _MedicationScheduleScreenState
           color: kDanger,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_rounded, color: Colors.white, size: 22),
-            SizedBox(height: 4),
-            Text('Remove',
-                style: TextStyle(
+            const Icon(Icons.delete_rounded, color: Colors.white, size: 22),
+            const SizedBox(height: 4),
+            Text(l10n.remove,
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 11,
                     fontWeight: FontWeight.w700)),
@@ -725,7 +730,7 @@ class _MedicationScheduleScreenState
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -753,7 +758,7 @@ class _MedicationScheduleScreenState
                           boxShadow: med.active
                               ? [
                                   BoxShadow(
-                                    color: kSuccess.withOpacity(0.4),
+                                    color: kSuccess.withValues(alpha: 0.4),
                                     blurRadius: 4,
                                   )
                                 ]
@@ -766,7 +771,7 @@ class _MedicationScheduleScreenState
                         height: 36,
                         decoration: BoxDecoration(
                           color: (med.active ? kP4 : Colors.grey.shade400)
-                              .withOpacity(0.1),
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(Icons.medication_liquid_rounded,
@@ -804,11 +809,11 @@ class _MedicationScheduleScreenState
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: kP3.withOpacity(0.07),
+                                    color: kP3.withValues(alpha: 0.07),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    '${med.timesPerDay}× daily',
+                                    l10n.timesDaily(med.timesPerDay),
                                     style: TextStyle(
                                       fontSize: 9,
                                       fontWeight: FontWeight.w700,
@@ -867,14 +872,16 @@ class _MedicationScheduleScreenState
     );
   }
 
-  Widget _buildExpandedContent(_MedEntry med) => Container(
+  Widget _buildExpandedContent(_MedEntry med) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
         padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
             const SizedBox(height: 14),
-            _exLabel('Dosage'),
+            _exLabel(l10n.dosageFieldLabel),
             const SizedBox(height: 6),
             TextFormField(
               controller: _doseCtrl[med.id],
@@ -884,7 +891,7 @@ class _MedicationScheduleScreenState
                   hint: 'e.g. 300 mg', icon: Icons.scale_rounded),
             ),
             const SizedBox(height: 14),
-            _exLabel('Times per day'),
+            _exLabel(l10n.timesPerDay),
             const SizedBox(height: 8),
             Row(
               children: [1, 2, 3, 4].map((n) {
@@ -916,7 +923,7 @@ class _MedicationScheduleScreenState
                             color: sel ? kP3 : Colors.grey.shade300),
                       ),
                       child: Text(
-                        '${n}×',
+                        '×',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
@@ -930,7 +937,7 @@ class _MedicationScheduleScreenState
               }).toList(),
             ),
             const SizedBox(height: 14),
-            _exLabel('Reminder times'),
+            _exLabel(l10n.reminderTimesLabel),
             const SizedBox(height: 10),
             ...med.times.asMap().entries.map((e) {
               final i = e.key;
@@ -943,7 +950,7 @@ class _MedicationScheduleScreenState
                       width: 24,
                       height: 24,
                       decoration: BoxDecoration(
-                        color: kP2.withOpacity(0.07),
+                        color: kP2.withValues(alpha: 0.07),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -955,7 +962,7 @@ class _MedicationScheduleScreenState
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text('Dose ${i + 1}',
+                    Text(l10n.doseLabel(i + 1),
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -988,9 +995,9 @@ class _MedicationScheduleScreenState
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 9),
                         decoration: BoxDecoration(
-                          color: kP3.withOpacity(0.07),
+                          color: kP3.withValues(alpha: 0.07),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: kP3.withOpacity(0.25)),
+                          border: Border.all(color: kP3.withValues(alpha: 0.25)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1033,7 +1040,7 @@ class _MedicationScheduleScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        med.active ? 'Active' : 'Inactive',
+                        med.active ? l10n.activeLabel : l10n.inactiveLabel,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -1042,8 +1049,8 @@ class _MedicationScheduleScreenState
                       ),
                       Text(
                         med.active
-                            ? 'Patient receives reminders for this medication'
-                            : 'No reminders sent — medication paused',
+                            ? l10n.patientReceivesReminders
+                            : l10n.noRemindersSent,
                         style: TextStyle(
                             fontSize: 10,
                             color: Colors.grey.shade400,
@@ -1054,7 +1061,7 @@ class _MedicationScheduleScreenState
                 ),
                 Switch(
                   value: med.active,
-                  activeColor: kSuccess,
+                  activeThumbColor: kSuccess,
                   inactiveThumbColor: Colors.grey.shade400,
                   inactiveTrackColor: Colors.grey.shade200,
                   onChanged: (v) => setState(() {
@@ -1067,9 +1074,12 @@ class _MedicationScheduleScreenState
           ],
         ),
       );
+  }
 
   // ── Add button ────────────────────────────────────────────────────────────
-  Widget _buildAddButton() => GestureDetector(
+  Widget _buildAddButton() {
+    final l10n = AppLocalizations.of(context)!;
+    return GestureDetector(
         onTap: _showAddSheet,
         child: Container(
           width: double.infinity,
@@ -1078,7 +1088,7 @@ class _MedicationScheduleScreenState
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-                color: kP4.withOpacity(0.45),
+                color: kP4.withValues(alpha: 0.45),
                 width: 1.5,
                 style: BorderStyle.solid),
           ),
@@ -1088,7 +1098,7 @@ class _MedicationScheduleScreenState
               Icon(Icons.add_circle_rounded, color: kP4, size: 20),
               const SizedBox(width: 8),
               Text(
-                '+ Add Medication',
+                l10n.addMedication,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -1099,9 +1109,12 @@ class _MedicationScheduleScreenState
           ),
         ),
       );
+  }
 
   // ── Empty state ───────────────────────────────────────────────────────────
-  Widget _buildEmpty() => Center(
+  Widget _buildEmpty() {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
@@ -1111,20 +1124,20 @@ class _MedicationScheduleScreenState
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: kP1.withOpacity(0.15),
+                  color: kP1.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.medication_rounded, size: 36, color: kP4),
               ),
               const SizedBox(height: 16),
-              const Text('No medications yet',
-                  style: TextStyle(
+              Text(l10n.noMedicationsYet,
+                  style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: kP2)),
               const SizedBox(height: 6),
               Text(
-                'Tap below to add the first medication for this patient.',
+                l10n.addFirstMedication,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 13,
@@ -1135,7 +1148,7 @@ class _MedicationScheduleScreenState
               ElevatedButton.icon(
                 onPressed: _showAddSheet,
                 icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add Medication'),
+                label: Text(l10n.addMedication),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kP3,
                   foregroundColor: Colors.white,
@@ -1151,16 +1164,19 @@ class _MedicationScheduleScreenState
           ),
         ),
       );
+  }
 
   // ── Save bar ──────────────────────────────────────────────────────────────
-  Widget _buildSaveBar() => Container(
+  Widget _buildSaveBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
         padding: EdgeInsets.fromLTRB(
             16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.07),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -1169,7 +1185,7 @@ class _MedicationScheduleScreenState
         child: ElevatedButton.icon(
           onPressed: _hasChanges ? _save : null,
           icon: const Icon(Icons.save_rounded, size: 18),
-          label: Text(_hasChanges ? 'Save Changes' : 'No Changes'),
+          label: Text(_hasChanges ? l10n.saveChanges : l10n.noChanges),
           style: ElevatedButton.styleFrom(
             backgroundColor:
                 _hasChanges ? kP4 : Colors.grey.shade300,
@@ -1183,6 +1199,7 @@ class _MedicationScheduleScreenState
           ),
         ),
       );
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   Widget _exLabel(String label) => Text(

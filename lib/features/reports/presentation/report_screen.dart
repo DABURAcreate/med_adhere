@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
@@ -87,8 +88,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _generatePreview() async {
+    final l10n = AppLocalizations.of(context)!;
     if (_type == _ReportType.perPatient && _selectedPatient == null) {
-      _showSnack('Please select a patient first.');
+      _showSnack(l10n.pleaseSelectPatient);
       return;
     }
 
@@ -129,20 +131,24 @@ class _ReportScreenState extends State<ReportScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _generatingPreview = false);
-        _showSnack('Error loading report: $e');
+        _showSnack(l10n.errorLoadingReport(e.toString()));
       }
     }
   }
 
   Future<void> _export() async {
+    // Capture context-dependent values before any async gaps.
+    final clinicName = context.read<SessionProvider>().workerClinicName ?? 'Clinic';
+    final exportContext = context;
+
     if (!_hasGenerated || _previewRows.isEmpty) {
       await _generatePreview();
+      if (!mounted) return;
       if (_previewRows.isEmpty) return;
     }
 
+    if (!mounted) return;
     setState(() => _isExporting = true);
-
-    final clinicName = context.read<SessionProvider>().workerClinicName ?? 'Clinic';
 
     await ReportExportService.instance.export(
       config: ReportConfig(
@@ -159,10 +165,12 @@ class _ReportScreenState extends State<ReportScreen> {
         endDate: _endDate,
         rows: _previewRows,
       ),
-      context: context,
+      // ignore: use_build_context_synchronously
+      context: exportContext,
     );
 
-    if (mounted) setState(() => _isExporting = false);
+    if (!mounted) return;
+    setState(() => _isExporting = false);
   }
 
   void _showSnack(String msg) => ScaffoldMessenger.of(context).showSnackBar(
@@ -241,7 +249,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() => AppBar(
+  PreferredSizeWidget _buildAppBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return AppBar(
     backgroundColor: kP2,
     foregroundColor: Colors.white,
     elevation: 0,
@@ -249,8 +259,8 @@ class _ReportScreenState extends State<ReportScreen> {
       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
       onPressed: () => context.pop(),
     ),
-    title: const Text('Reports',
-        style: TextStyle(
+    title: Text(l10n.reports,
+        style: const TextStyle(
             fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
     flexibleSpace: Container(
       decoration: const BoxDecoration(
@@ -269,12 +279,15 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     ),
   );
+  }
 
   // ── Report type cards ─────────────────────────────────────────────────────
-  Widget _buildTypeCards() => Column(
+  Widget _buildTypeCards() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _sectionLabel('Report Type'),
+      _sectionLabel(l10n.reportType),
       const SizedBox(height: 10),
       Row(
         children: [
@@ -282,21 +295,22 @@ class _ReportScreenState extends State<ReportScreen> {
               child: _typeCard(
                 _ReportType.perPatient,
                 icon: Icons.person_rounded,
-                title: 'Per Patient',
-                subtitle: 'Individual adherence\nby date range',
+                title: l10n.perPatient,
+                subtitle: l10n.perPatientSubtitle,
               )),
           const SizedBox(width: 12),
           Expanded(
               child: _typeCard(
                 _ReportType.perClinic,
                 icon: Icons.local_hospital_rounded,
-                title: 'Per Clinic',
-                subtitle: 'All patients overview\nby date range',
+                title: l10n.perClinic,
+                subtitle: l10n.perClinicSubtitle,
               )),
         ],
       ),
     ],
   );
+  }
 
   Widget _typeCard(_ReportType t,
       {required IconData icon,
@@ -314,7 +328,7 @@ class _ReportScreenState extends State<ReportScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? kP3.withOpacity(0.04) : kCard,
+          color: selected ? kP3.withValues(alpha: 0.04) : kCard,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: selected ? kP3 : Colors.grey.shade200,
@@ -323,13 +337,13 @@ class _ReportScreenState extends State<ReportScreen> {
           boxShadow: selected
               ? [
                   BoxShadow(
-                      color: kP3.withOpacity(0.15),
+                      color: kP3.withValues(alpha: 0.15),
                       blurRadius: 12,
                       offset: const Offset(0, 4))
                 ]
               : [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 6,
                       offset: const Offset(0, 2))
                 ],
@@ -342,7 +356,7 @@ class _ReportScreenState extends State<ReportScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color:
-                    (selected ? kP3 : Colors.grey.shade400).withOpacity(0.12),
+                    (selected ? kP3 : Colors.grey.shade400).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon,
@@ -379,7 +393,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  selected ? 'Selected' : 'Tap to select',
+                  selected ? AppLocalizations.of(context)!.selected : AppLocalizations.of(context)!.tapToSelect,
                   style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -394,14 +408,16 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ── Options card ──────────────────────────────────────────────────────────
-  Widget _buildOptionsCard() => Container(
+  Widget _buildOptionsCard() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: kCard,
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 3))
       ],
@@ -411,7 +427,7 @@ class _ReportScreenState extends State<ReportScreen> {
       children: [
         // Patient selector (per-patient only)
         if (_type == _ReportType.perPatient) ...[
-          _sectionLabel('Patient'),
+          _sectionLabel(l10n.patientLabel),
           const SizedBox(height: 8),
           _loadingPatients
               ? Container(
@@ -425,11 +441,12 @@ class _ReportScreenState extends State<ReportScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: _selectedPatient != null
-                          ? kP4.withOpacity(0.4)
+                          ? kP4.withValues(alpha: 0.4)
                           : Colors.transparent,
                     ),
                   ),
                   child: DropdownButtonFormField<Patient>(
+                    // ignore: deprecated_member_use
                     value: _selectedPatient,
                     decoration: InputDecoration(
                       prefixIcon: Icon(Icons.person_search_rounded,
@@ -447,8 +464,8 @@ class _ReportScreenState extends State<ReportScreen> {
                         borderSide: BorderSide(color: kP4, width: 1.5),
                       ),
                       hintText: _patientList.isEmpty
-                          ? 'No patients found'
-                          : 'Select a patient…',
+                          ? l10n.noPatientsFoundHint
+                          : l10n.selectPatient,
                       hintStyle: TextStyle(
                           color: Colors.grey.shade400, fontSize: 13),
                     ),
@@ -484,7 +501,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
         // Clinic label (per-clinic)
         if (_type == _ReportType.perClinic) ...[
-          _sectionLabel('Clinic'),
+          _sectionLabel(l10n.clinicLabel),
           const SizedBox(height: 8),
           Container(
             padding:
@@ -510,10 +527,10 @@ class _ReportScreenState extends State<ReportScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: kSuccess.withOpacity(0.1),
+                    color: kSuccess.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Text('Auto',
+                  child: Text(l10n.autoLabel,
                       style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
@@ -528,7 +545,7 @@ class _ReportScreenState extends State<ReportScreen> {
         ],
 
         // Date range
-        _sectionLabel('Date Range'),
+        _sectionLabel(l10n.dateRange),
         const SizedBox(height: 8),
         GestureDetector(
           onTap: _pickDateRange,
@@ -556,7 +573,7 @@ class _ReportScreenState extends State<ReportScreen> {
                             color: Color(0xFF1A1A2E)),
                       ),
                       Text(
-                        '${_endDate.difference(_startDate).inDays + 1} days',
+                        l10n.daysCount(_endDate.difference(_startDate).inDays + 1),
                         style: TextStyle(
                             fontSize: 10, color: Colors.grey.shade500),
                       ),
@@ -574,7 +591,7 @@ class _ReportScreenState extends State<ReportScreen> {
         const SizedBox(height: 16),
 
         // Format selector
-        _sectionLabel('Export Format'),
+        _sectionLabel(l10n.exportFormat),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -592,6 +609,7 @@ class _ReportScreenState extends State<ReportScreen> {
       ],
     ),
   );
+  }
 
   Widget _formatChip(_ExportFormat f,
       {required IconData icon, required String label, required Color color}) {
@@ -603,7 +621,7 @@ class _ReportScreenState extends State<ReportScreen> {
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: sel ? color.withOpacity(0.1) : Colors.grey.shade50,
+            color: sel ? color.withValues(alpha: 0.1) : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
                 color: sel ? color : Colors.grey.shade200,
@@ -628,7 +646,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   // ── Generate preview button ───────────────────────────────────────────────
-  Widget _buildGenerateButton() => OutlinedButton.icon(
+  Widget _buildGenerateButton() {
+    final l10n = AppLocalizations.of(context)!;
+    return OutlinedButton.icon(
     onPressed: _generatingPreview ? null : _generatePreview,
     icon: _generatingPreview
         ? const SizedBox(
@@ -636,10 +656,10 @@ class _ReportScreenState extends State<ReportScreen> {
             height: 16,
             child: CircularProgressIndicator(strokeWidth: 2))
         : const Icon(Icons.preview_rounded, size: 16),
-    label: Text(_generatingPreview ? 'Loading…' : 'Preview Report Data'),
+    label: Text(_generatingPreview ? l10n.loading : l10n.previewReportData),
     style: OutlinedButton.styleFrom(
       foregroundColor: kP3,
-      side: BorderSide(color: kP3.withOpacity(0.5), width: 1.5),
+      side: BorderSide(color: kP3.withValues(alpha: 0.5), width: 1.5),
       minimumSize: const Size(double.infinity, 46),
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -647,9 +667,11 @@ class _ReportScreenState extends State<ReportScreen> {
           const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
     ),
   );
+  }
 
   // ── Preview section ───────────────────────────────────────────────────────
   Widget _buildPreviewSection() {
+    final l10n = AppLocalizations.of(context)!;
     if (_previewRows.isEmpty) return _buildEmptyState();
 
     final totalTaken = _previewRows.fold(0, (s, r) => s + r.taken);
@@ -662,9 +684,9 @@ class _ReportScreenState extends State<ReportScreen> {
       children: [
         Row(
           children: [
-            _sectionLabel('Preview'),
+            _sectionLabel(l10n.previewLabel),
             const Spacer(),
-            Text('${_previewRows.length} rows',
+            Text(l10n.rowsCount(_previewRows.length),
                 style: TextStyle(
                     fontSize: 11,
                     color: Colors.grey.shade500,
@@ -675,12 +697,12 @@ class _ReportScreenState extends State<ReportScreen> {
 
         Row(
           children: [
-            _statBubble('$totalTaken', 'Taken', kSuccess),
+            _statBubble('$totalTaken', l10n.taken, kSuccess),
             const SizedBox(width: 8),
-            _statBubble('$totalMissed', 'Missed', kDanger),
+            _statBubble('$totalMissed', l10n.missed, kDanger),
             const SizedBox(width: 8),
             _statBubble(
-                '${avgAdherence.toStringAsFixed(0)}%', 'Avg', kP4),
+                '${avgAdherence.toStringAsFixed(0)}%', l10n.statAvg, kP4),
           ],
         ),
         const SizedBox(height: 12),
@@ -691,7 +713,7 @@ class _ReportScreenState extends State<ReportScreen> {
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 3))
             ],
@@ -707,19 +729,19 @@ class _ReportScreenState extends State<ReportScreen> {
                 horizontalMargin: 14,
                 columnSpacing: 16,
                 headingRowColor:
-                    WidgetStateProperty.all(kP2.withOpacity(0.05)),
+                    WidgetStateProperty.all(kP2.withValues(alpha: 0.05)),
                 border: TableBorder(
                   horizontalInside: BorderSide(
                       color: Colors.grey.shade100, width: 1),
                 ),
                 columns: [
-                  _col('Date'),
+                  _col(l10n.columnDate),
                   _col(_type == _ReportType.perPatient
-                      ? 'Medication'
-                      : 'Patient'),
-                  _col('Taken'),
-                  _col('Missed'),
-                  _col('Adh. %'),
+                      ? l10n.columnMedication
+                      : l10n.columnPatient),
+                  _col(l10n.taken),
+                  _col(l10n.missed),
+                  _col(l10n.columnAdherence),
                 ],
                 rows: _previewRows
                     .map((r) => DataRow(cells: [
@@ -753,7 +775,7 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(width: 5),
             Expanded(
               child: Text(
-                'Preview shows data from local storage. Sync for the latest cloud data.',
+                l10n.previewNote,
                 style: TextStyle(
                     fontSize: 10,
                     color: Colors.grey.shade400,
@@ -776,7 +798,7 @@ class _ReportScreenState extends State<ReportScreen> {
     width: 28,
     height: 24,
     decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       borderRadius: BorderRadius.circular(6),
     ),
     child: Center(
@@ -795,7 +817,7 @@ class _ReportScreenState extends State<ReportScreen> {
           width: 38,
           height: 24,
           decoration: BoxDecoration(
-            color: c.withOpacity(0.1),
+            color: c.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(
@@ -812,9 +834,9 @@ class _ReportScreenState extends State<ReportScreen> {
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -836,7 +858,9 @@ class _ReportScreenState extends State<ReportScreen> {
   );
 
   // ── Empty state ───────────────────────────────────────────────────────────
-  Widget _buildEmptyState() => Container(
+  Widget _buildEmptyState() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: const EdgeInsets.symmetric(vertical: 32),
     alignment: Alignment.center,
     child: Column(
@@ -845,18 +869,18 @@ class _ReportScreenState extends State<ReportScreen> {
           width: 68,
           height: 68,
           decoration: BoxDecoration(
-            color: kP1.withOpacity(0.15),
+            color: kP1.withValues(alpha: 0.15),
             shape: BoxShape.circle,
           ),
           child: Icon(Icons.bar_chart_rounded, size: 32, color: kP4),
         ),
         const SizedBox(height: 14),
-        const Text('No data for this range',
-            style: TextStyle(
+        Text(l10n.noDataForRange,
+            style: const TextStyle(
                 fontSize: 15, fontWeight: FontWeight.w800, color: kP2)),
         const SizedBox(height: 6),
         Text(
-          'No adherence records were found for the selected\npatient and date range. Try widening your selection.',
+          l10n.noDataSubtitle,
           textAlign: TextAlign.center,
           style: TextStyle(
               fontSize: 12, color: Colors.grey.shade500, height: 1.5),
@@ -864,16 +888,19 @@ class _ReportScreenState extends State<ReportScreen> {
       ],
     ),
   );
+  }
 
   // ── Export bar ────────────────────────────────────────────────────────────
-  Widget _buildExportBar() => Container(
+  Widget _buildExportBar() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: EdgeInsets.fromLTRB(
         16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
     decoration: BoxDecoration(
       color: Colors.white,
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.07),
+            color: Colors.black.withValues(alpha: 0.07),
             blurRadius: 10,
             offset: const Offset(0, -3))
       ],
@@ -883,7 +910,7 @@ class _ReportScreenState extends State<ReportScreen> {
       style: ElevatedButton.styleFrom(
         backgroundColor: kP4,
         foregroundColor: Colors.white,
-        disabledBackgroundColor: kP4.withOpacity(0.55),
+        disabledBackgroundColor: kP4.withValues(alpha: 0.55),
         disabledForegroundColor: Colors.white70,
         minimumSize: const Size(double.infinity, 52),
         shape:
@@ -912,12 +939,13 @@ class _ReportScreenState extends State<ReportScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(_hasGenerated
-                    ? 'Export ${_format == _ExportFormat.pdf ? "PDF" : "CSV"} Report'
-                    : 'Preview & Export'),
+                    ? (_format == _ExportFormat.pdf ? l10n.exportPDF : l10n.exportCSV)
+                    : l10n.previewAndExport),
               ],
             ),
     ),
   );
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   Widget _sectionLabel(String text) => Text(

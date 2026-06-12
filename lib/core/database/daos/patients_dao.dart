@@ -162,6 +162,22 @@ class PatientsDao extends DatabaseAccessor<AppDatabase>
         ),
       );
 
+  /// Update both caregiver phone and relationship in a single write.
+  Future<int> updateCaregiverInfo(
+    int id, {
+    required String? phone,
+    required String? relationship,
+  }) =>
+      updatePatientFields(
+        id,
+        PatientsCompanion(
+          caregiverPhone: Value(phone),
+          caregiverRelationship: Value(relationship),
+          isSynced: const Value(false),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
+
   // ─── DELETE ───────────────────────────────────────────────────────────────
 
   /// Hard delete a patient by id.

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router.dart';
+import '../../../l10n/app_localizations.dart';
 
 class MedAdhereBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -13,6 +14,7 @@ class MedAdhereBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: const BoxDecoration(
@@ -25,7 +27,7 @@ class MedAdhereBottomNav extends StatelessWidget {
             onTap: () => context.go(AppRoutes.dashboard),
             child: _buildNavItem(
               icon: Icons.dashboard_rounded,
-              label: 'HOME',
+              label: l10n.navWorkerHome,
               index: 0,
             ),
           ),
@@ -34,7 +36,7 @@ class MedAdhereBottomNav extends StatelessWidget {
             onTap: () => context.go(AppRoutes.patientList),
             child: _buildNavItem(
               icon: Icons.people_alt_rounded,
-              label: 'PATIENTS',
+              label: l10n.navWorkerPatients,
               index: 1,
             ),
           ),
@@ -43,7 +45,7 @@ class MedAdhereBottomNav extends StatelessWidget {
             onTap: () => context.go(AppRoutes.reports),
             child: _buildNavItem(
               icon: Icons.bar_chart_rounded,
-              label: 'REPORTS',
+              label: l10n.navWorkerReports,
               index: 2,
             ),
           ),
@@ -52,7 +54,7 @@ class MedAdhereBottomNav extends StatelessWidget {
             onTap: () => context.go(AppRoutes.registerPatient),
             child: _buildNavItem(
               icon: Icons.person_add_alt_1_rounded,
-              label: 'REGISTER',
+              label: l10n.navWorkerRegister,
               index: 3,
             ),
           ),

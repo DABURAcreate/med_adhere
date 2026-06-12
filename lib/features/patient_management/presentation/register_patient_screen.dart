@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/session_provider.dart';
@@ -18,24 +19,18 @@ const kCard = Color(0xFFFFFFFF);
 
 // ── Models ────────────────────────────────────────────────────────────────────
 class _MedicationEntry {
-  String name;
-  String dosage;
-  int timesPerDay;
+  String name = '';
+  String dosage = '';
+  int timesPerDay = 1;
   List<TimeOfDay> reminderTimes;
 
-  _MedicationEntry({
-    this.name = '',
-    this.dosage = '',
-    this.timesPerDay = 1,
-    List<TimeOfDay>? reminderTimes,
-  }) : reminderTimes = reminderTimes ?? [const TimeOfDay(hour: 8, minute: 0)];
+  _MedicationEntry({List<TimeOfDay>? reminderTimes})
+      : reminderTimes = reminderTimes ?? [const TimeOfDay(hour: 8, minute: 0)];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 String _generatePatientCode() {
   final rand = Random();
-  final letters = String.fromCharCodes(
-      List.generate(3, (_) => rand.nextInt(26) + 65));
   final digits = rand.nextInt(9000) + 1000;
   return 'MBM-$digits';
 }
@@ -120,7 +115,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
     if (_step == 0) {
       if (!(_step1Key.currentState?.validate() ?? false)) return;
       if (_selectedConditions.isEmpty) {
-        _showSnack('Please select at least one condition.');
+        _showSnack(AppLocalizations.of(context)!.conditionRequired);
         return;
       }
     }
@@ -178,7 +173,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         setState(() => _activationCode = activationCode);
         _showSuccessSheet();
       case RegistrationFailure(:final message):
-        _showSnack('Registration failed: $message');
+        _showSnack(AppLocalizations.of(context)!.registrationFailed(message));
     }
   }
 
@@ -219,9 +214,9 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
       onPressed: () => context.pop(),
     ),
-    title: const Text(
-      'Register Patient',
-      style: TextStyle(
+    title: Text(
+      AppLocalizations.of(context)!.registerPatient,
+      style: const TextStyle(
           fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
     ),
     flexibleSpace: Container(
@@ -244,7 +239,8 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
 
   // ── Stepper ───────────────────────────────────────────────────────────────
   Widget _buildStepper() {
-    final steps = ['Patient\nInfo', 'Medications', 'Reminders', 'Confirm'];
+    final l10n = AppLocalizations.of(context)!;
+    final steps = [l10n.stepPatientInfo, l10n.medications, l10n.remindersTitle, l10n.stepConfirm];
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
@@ -277,7 +273,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                             boxShadow: active
                                 ? [
                               BoxShadow(
-                                  color: kP3.withOpacity(0.35),
+                                  color: kP3.withValues(alpha: 0.35),
                                   blurRadius: 8,
                                   offset: const Offset(0, 3))
                             ]
@@ -342,14 +338,16 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
   }
 
   // ── Bottom nav ────────────────────────────────────────────────────────────
-  Widget _buildBottomNav() => Container(
+  Widget _buildBottomNav() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     padding: EdgeInsets.fromLTRB(
         16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
     decoration: BoxDecoration(
       color: Colors.white,
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, -3))
       ],
@@ -361,10 +359,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             child: OutlinedButton.icon(
               onPressed: _back,
               icon: const Icon(Icons.arrow_back_rounded, size: 16),
-              label: const Text('Back'),
+              label: Text(l10n.back),
               style: OutlinedButton.styleFrom(
                 foregroundColor: kP3,
-                side: BorderSide(color: kP3.withOpacity(0.5)),
+                side: BorderSide(color: kP3.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -388,7 +386,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               disabledBackgroundColor: (_step == 3
                       ? const Color(0xFF16A34A)
                       : kP3)
-                  .withOpacity(0.6),
+                  .withValues(alpha: 0.6),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
@@ -416,7 +414,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                         size: 18,
                       ),
                       const SizedBox(width: 8),
-                      Text(_step == 3 ? 'Register Patient' : 'Next'),
+                      Text(_step == 3 ? l10n.registerPatientButton : l10n.next),
                     ],
                   ),
           ),
@@ -424,39 +422,41 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       ],
     ),
   );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 1 — Patient Info
   // ════════════════════════════════════════════════════════════════════════════
-  Widget _buildStep1() => SingleChildScrollView(
+  Widget _buildStep1() {
+    final l10n = AppLocalizations.of(context)!;
+    return SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
     child: Form(
       key: _step1Key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _stepHeading('Patient Information',
-              'Enter the patient\'s basic details as recorded at the clinic.'),
+          _stepHeading(l10n.patientInformationTitle, l10n.patientInformationSubtitle),
           const SizedBox(height: 20),
 
           // Full name
-          _fieldLabel('Full Name *'),
+          _fieldLabel(l10n.fullNameLabel),
           const SizedBox(height: 6),
           _textField(
             controller: _fullNameCtrl,
             hint: 'e.g. Sipho Dlamini',
             icon: Icons.person_rounded,
             validator: (v) =>
-            (v == null || v.trim().isEmpty) ? 'Full name is required' : null,
+            (v == null || v.trim().isEmpty) ? l10n.fullNameRequired : null,
             textCapitalization: TextCapitalization.words,
           ),
           const SizedBox(height: 16),
 
           // Clinic code
-          _fieldLabel('Clinic Patient Code *'),
+          _fieldLabel(l10n.clinicPatientCodeLabel),
           const SizedBox(height: 4),
           Text(
-            'Auto-generated — edit if needed',
+            l10n.codeAutoGenerated,
             style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 6),
@@ -468,7 +468,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                   hint: 'e.g. MBM-0041',
                   icon: Icons.badge_rounded,
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Patient code is required'
+                      ? l10n.patientCodeRequired
                       : null,
                 ),
               ),
@@ -484,10 +484,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           const SizedBox(height: 16),
 
           // Conditions
-          _fieldLabel('Condition(s) *'),
+          _fieldLabel(l10n.conditionsLabel),
           const SizedBox(height: 4),
           Text(
-            'Select all that apply',
+            l10n.conditionsHint,
             style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 10),
@@ -531,7 +531,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           const SizedBox(height: 16),
 
           // Caregiver phone
-          _fieldLabel('Caregiver Phone Number (optional)'),
+          _fieldLabel(l10n.caregiverPhoneOptional),
           const SizedBox(height: 6),
           _textField(
             controller: _caregiverPhoneCtrl,
@@ -544,26 +544,27 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           _infoBox(
             icon: Icons.lock_rounded,
             color: kP4,
-            text:
-            'Full name and ID are stored securely on the backend only. The local device stores only the clinic patient code.',
+            text: l10n.secureStorageInfo,
           ),
         ],
       ),
     ),
   );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 2 — Medications
   // ════════════════════════════════════════════════════════════════════════════
-  Widget _buildStep2() => SingleChildScrollView(
+  Widget _buildStep2() {
+    final l10n = AppLocalizations.of(context)!;
+    return SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
     child: Form(
       key: _step2Key,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _stepHeading('Medications',
-              'Add all medications the patient must take.'),
+          _stepHeading(l10n.medications, l10n.medicationsSubtitle),
           const SizedBox(height: 20),
 
           ..._medications.asMap().entries.map((e) {
@@ -582,7 +583,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: kP4.withOpacity(0.5),
+                    color: kP4.withValues(alpha: 0.5),
                     width: 1.5,
                     style: BorderStyle.solid),
               ),
@@ -592,7 +593,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                   Icon(Icons.add_circle_rounded, color: kP4, size: 20),
                   const SizedBox(width: 8),
                   Text(
-                    '+ Add Another Medication',
+                    l10n.addAnotherMedication,
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -607,8 +608,11 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       ),
     ),
   );
+  }
 
-  Widget _buildMedCard(int idx, _MedicationEntry med) => Container(
+  Widget _buildMedCard(int idx, _MedicationEntry med) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
     margin: const EdgeInsets.only(bottom: 14),
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
@@ -616,7 +620,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       borderRadius: BorderRadius.circular(16),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3))
       ],
@@ -630,7 +634,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: kP4.withOpacity(0.1),
+                color: kP4.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
@@ -640,7 +644,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             ),
             const SizedBox(width: 8),
             Text(
-              'Medication ${idx + 1}',
+              l10n.medicationCard(idx + 1),
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
@@ -658,7 +662,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         ),
         const SizedBox(height: 14),
 
-        _fieldLabel('Medication Name *'),
+        _fieldLabel(l10n.medicationNameLabel),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: med.name,
@@ -667,12 +671,12 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           decoration: _inputDecoration(
               hint: 'e.g. Tenofovir / Lamivudine', icon: Icons.medication_liquid_rounded),
           validator: (v) => (v == null || v.trim().isEmpty)
-              ? 'Medication name is required'
+              ? l10n.medicationNameRequired
               : null,
         ),
         const SizedBox(height: 12),
 
-        _fieldLabel('Dosage *'),
+        _fieldLabel(l10n.dosageFieldLabel),
         const SizedBox(height: 6),
         TextFormField(
           initialValue: med.dosage,
@@ -681,11 +685,11 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           decoration: _inputDecoration(
               hint: 'e.g. 300/300/50 mg', icon: Icons.scale_rounded),
           validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Dosage is required' : null,
+          (v == null || v.trim().isEmpty) ? l10n.dosageRequired : null,
         ),
         const SizedBox(height: 12),
 
-        _fieldLabel('Times per day *'),
+        _fieldLabel(l10n.timesPerDayField),
         const SizedBox(height: 8),
         Row(
           children: [1, 2, 3, 4].map((n) {
@@ -724,17 +728,19 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       ],
     ),
   );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 3 — Reminders
   // ════════════════════════════════════════════════════════════════════════════
-  Widget _buildStep3() => SingleChildScrollView(
+  Widget _buildStep3() {
+    final l10n = AppLocalizations.of(context)!;
+    return SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _stepHeading('Set Reminder Times',
-            'Set daily reminder times for each medication. These are set on behalf of the patient.'),
+        _stepHeading(l10n.remindersTitle, l10n.remindersSubtitle),
         const SizedBox(height: 20),
 
         ..._medications.asMap().entries.map((e) {
@@ -748,7 +754,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 3))
               ],
@@ -762,7 +768,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: kP4.withOpacity(0.1),
+                        color: kP4.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.medication_rounded,
@@ -772,7 +778,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                     Expanded(
                       child: Text(
                         med.name.isEmpty
-                            ? 'Medication ${idx + 1}'
+                            ? l10n.medicationCard(idx + 1)
                             : med.name,
                         style: const TextStyle(
                           fontSize: 13,
@@ -786,11 +792,11 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: kP3.withOpacity(0.08),
+                        color: kP3.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '${med.timesPerDay}× daily',
+                        l10n.timesDaily(med.timesPerDay),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -812,7 +818,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                           width: 24,
                           height: 24,
                           decoration: BoxDecoration(
-                            color: kP2.withOpacity(0.08),
+                            color: kP2.withValues(alpha: 0.08),
                             shape: BoxShape.circle,
                           ),
                           child: Center(
@@ -828,7 +834,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'Dose ${ti + 1}',
+                          l10n.doseLabel(ti + 1),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -861,10 +867,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: kP3.withOpacity(0.07),
+                              color: kP3.withValues(alpha: 0.07),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                  color: kP3.withOpacity(0.25)),
+                                  color: kP3.withValues(alpha: 0.25)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -899,44 +905,45 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
         _infoBox(
           icon: Icons.info_outline_rounded,
           color: kP4,
-          text:
-          'Reminder times are set by the worker on behalf of the patient. The patient can adjust these after activating their account.',
+          text: l10n.remindersInfo,
         ),
       ],
     ),
   );
+  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // STEP 4 — Confirm
   // ════════════════════════════════════════════════════════════════════════════
-  Widget _buildStep4() => SingleChildScrollView(
+  Widget _buildStep4() {
+    final l10n = AppLocalizations.of(context)!;
+    return SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _stepHeading('Confirm Registration',
-            'Review all details before registering the patient.'),
+        _stepHeading(l10n.confirmRegistrationTitle, l10n.confirmRegistrationSubtitle),
         const SizedBox(height: 20),
 
         // Patient info summary
         _summaryCard(
-          title: 'Patient Information',
+          title: l10n.summaryPatientInformation,
           icon: Icons.person_rounded,
           onEdit: () => _goToStep(0),
           children: [
-            _summaryRow('Full Name', _fullNameCtrl.text.isEmpty ? '—' : _fullNameCtrl.text),
-            _summaryRow('Clinic Code', _patientCodeCtrl.text),
-            _summaryRow('Conditions',
+            _summaryRow(l10n.summaryFullName, _fullNameCtrl.text.isEmpty ? '—' : _fullNameCtrl.text),
+            _summaryRow(l10n.summaryClinicCode, _patientCodeCtrl.text),
+            _summaryRow(l10n.summaryConditions,
                 _selectedConditions.isEmpty ? '—' : _selectedConditions.join(', ')),
             if (_caregiverPhoneCtrl.text.isNotEmpty)
-              _summaryRow('Caregiver Phone', _caregiverPhoneCtrl.text),
+              _summaryRow(l10n.summaryCaregiverPhone, _caregiverPhoneCtrl.text),
           ],
         ),
         const SizedBox(height: 12),
 
         // Medications summary
         _summaryCard(
-          title: 'Medications',
+          title: l10n.medications,
           icon: Icons.medication_rounded,
           onEdit: () => _goToStep(1),
           children: _medications.asMap().entries.map((e) {
@@ -951,7 +958,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
 
         // Reminders summary
         _summaryCard(
-          title: 'Reminders',
+          title: l10n.remindersTitle,
           icon: Icons.notifications_rounded,
           onEdit: () => _goToStep(2),
           children: _medications.asMap().entries.map((e) {
@@ -979,7 +986,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: kP2.withOpacity(0.3),
+                color: kP2.withValues(alpha: 0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 5),
               ),
@@ -993,28 +1000,28 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.key_rounded,
                         color: Colors.white, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Patient Activation Code',
-                          style: TextStyle(
+                          l10n.patientActivationCode,
+                          style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                           ),
                         ),
                         Text(
-                          'Give this code to the patient to activate their account',
-                          style: TextStyle(
+                          l10n.activationCodeHint,
+                          style: const TextStyle(
                             fontSize: 10,
                             color: Colors.white70,
                             height: 1.3,
@@ -1037,10 +1044,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                       height: 58,
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.3)),
+                            color: Colors.white.withValues(alpha: 0.3)),
                       ),
                       child: Center(
                         child: Text(
@@ -1062,26 +1069,26 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                 onTap: () {
                   Clipboard.setData(
                       ClipboardData(text: _activationCode));
-                  _showSnack('Code copied to clipboard');
+                  _showSnack(l10n.codeCopied);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: Colors.white.withOpacity(0.3)),
+                        color: Colors.white.withValues(alpha: 0.3)),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.copy_rounded,
+                      const Icon(Icons.copy_rounded,
                           color: Colors.white70, size: 14),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       Text(
-                        'Copy Code',
-                        style: TextStyle(
+                        l10n.copyCode,
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
@@ -1097,6 +1104,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       ],
     ),
   );
+  }
 
   // ── Summary card ──────────────────────────────────────────────────────────
   Widget _summaryCard({
@@ -1112,7 +1120,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 8,
                 offset: const Offset(0, 3))
           ],
@@ -1126,7 +1134,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: kP3.withOpacity(0.1),
+                    color: kP3.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, size: 16, color: kP3),
@@ -1147,7 +1155,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: kP3.withOpacity(0.08),
+                      color: kP3.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -1156,8 +1164,8 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                         Icon(Icons.edit_rounded, size: 11, color: kP3),
                         const SizedBox(width: 3),
                         Text(
-                          'Edit',
-                          style: TextStyle(
+                          AppLocalizations.of(context)!.edit,
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
                             color: kP3,
@@ -1209,6 +1217,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
 
   // ── Success sheet ─────────────────────────────────────────────────────────
   void _showSuccessSheet() {
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1230,16 +1239,16 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: const Color(0xFF16A34A).withOpacity(0.1),
+                color: const Color(0xFF16A34A).withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.how_to_reg_rounded,
                   size: 36, color: Color(0xFF16A34A)),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Patient Registered!',
-              style: TextStyle(
+            Text(
+              l10n.patientRegistered,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: kP2,
@@ -1247,7 +1256,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              '${_fullNameCtrl.text} has been registered successfully.',
+              l10n.patientRegisteredSuccess(_fullNameCtrl.text),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -1267,9 +1276,9 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
               ),
               child: Column(
                 children: [
-                  const Text(
-                    'PATIENT ACTIVATION CODE',
-                    style: TextStyle(
+                  Text(
+                    l10n.patientActivationCodeLabel,
+                    style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                       color: Colors.white70,
@@ -1287,10 +1296,10 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Share this 5-digit code with the patient.\nThey will use it to set their PIN and activate their account.',
+                  Text(
+                    l10n.activationCodeShare,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       color: Colors.white60,
                       height: 1.5,
@@ -1305,13 +1314,13 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             OutlinedButton.icon(
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: _activationCode));
-                _showSnack('Activation code copied');
+                _showSnack(l10n.activationCodeCopied);
               },
               icon: const Icon(Icons.copy_rounded, size: 16),
-              label: const Text('Copy Code'),
+              label: Text(l10n.copyCode),
               style: OutlinedButton.styleFrom(
                 foregroundColor: kP3,
-                side: BorderSide(color: kP3.withOpacity(0.5)),
+                side: BorderSide(color: kP3.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(
                     horizontal: 24, vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -1330,7 +1339,7 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
                 context.pop(); // back to patient list
               },
               icon: const Icon(Icons.check_rounded, size: 18),
-              label: const Text('Done'),
+              label: Text(l10n.done),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF16A34A),
                 foregroundColor: Colors.white,
@@ -1445,9 +1454,9 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
             width: 48,
             height: 50,
             decoration: BoxDecoration(
-              color: kP4.withOpacity(0.1),
+              color: kP4.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kP4.withOpacity(0.25)),
+              border: Border.all(color: kP4.withValues(alpha: 0.25)),
             ),
             child: Icon(icon, color: kP4, size: 20),
           ),
@@ -1462,9 +1471,9 @@ class _RegisterPatientScreenState extends State<RegisterPatientScreen> {
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.07),
+          color: color.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

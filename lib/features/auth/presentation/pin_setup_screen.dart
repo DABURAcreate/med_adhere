@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/router.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/notifications/notification_service.dart';
 import '../../../providers/session_provider.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
@@ -29,7 +32,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     if (_pin.length < 4 || _confirm.length < 4 || _loading) return;
 
     if (_pin != _confirm) {
-      setState(() => _error = 'PINs do not match. Please try again.');
+      setState(() => _error = AppLocalizations.of(context)!.pinMismatch);
       return;
     }
 
@@ -47,7 +50,16 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
     switch (result) {
       case AuthSuccess(:final userId):
-        context.read<SessionProvider>().signInAsPatient(int.parse(userId));
+        final patientId = int.parse(userId);
+        if (!mounted) return;
+        context.read<SessionProvider>().signInAsPatient(patientId);
+        // Request notification permission and schedule reminders.
+        await NotificationService.requestPermissions();
+        if (!mounted) return;
+        NotificationService.scheduleAllForPatient(
+          db: context.read<AppDatabase>(),
+          patientId: patientId,
+        );
         context.go(AppRoutes.patientHome);
       case AuthFailure(:final message):
         setState(() => _error = message);
@@ -56,6 +68,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: const Color(0xFFE9E9E9),
       body: SafeArea(
@@ -67,13 +80,13 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
               const MedAdhereHeader(),
               const SizedBox(height: 56),
 
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Create PIN:',
-                    style: TextStyle(
+                    l10n.createPin,
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
@@ -90,13 +103,13 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
               const SizedBox(height: 24),
 
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Confirm PIN:',
-                    style: TextStyle(
+                    l10n.confirmPinLabel,
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,

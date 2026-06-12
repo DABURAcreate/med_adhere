@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/database/app_database.dart';
@@ -44,12 +45,12 @@ class _PatientVM {
         lastAdherenceLogAt: p.lastAdherenceLogAt,
       );
 
-  String get lastLog {
-    if (lastAdherenceLogAt == null) return 'Never';
+  String lastLog(AppLocalizations l10n) {
+    if (lastAdherenceLogAt == null) return l10n.never;
     final diff = DateTime.now().difference(lastAdherenceLogAt!).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
-    return '$diff days ago';
+    if (diff == 0) return l10n.today;
+    if (diff == 1) return l10n.yesterday;
+    return l10n.daysAgo(diff);
   }
 }
 
@@ -139,18 +140,19 @@ class _PatientListScreenState extends State<PatientListScreen> {
     RiskLevel.low    => const Color(0xFF16A34A),
   };
 
-  String _riskLabel(RiskLevel r) => switch (r) {
-    RiskLevel.high   => 'High Risk',
-    RiskLevel.medium => 'Med Risk',
-    RiskLevel.low    => 'Low Risk',
+  String _riskLabel(RiskLevel r, AppLocalizations l10n) => switch (r) {
+    RiskLevel.high   => l10n.highRisk,
+    RiskLevel.medium => l10n.medRisk,
+    RiskLevel.low    => l10n.lowRisk,
   };
 
   // ── Sort menu ───────────────────────────────────────────────────────────────
   void _showSortMenu(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final items = {
-      _SortOption.riskLevel : 'Risk Level',
-      _SortOption.name      : 'Name',
-      _SortOption.lastActive: 'Last Active',
+      _SortOption.riskLevel : l10n.sortRiskLevel,
+      _SortOption.name      : l10n.sortName,
+      _SortOption.lastActive: l10n.sortLastActive,
     };
     showModalBottomSheet(
       context: context,
@@ -175,7 +177,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Sort by',
+            Text(l10n.sortBy,
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
@@ -255,9 +257,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
     foregroundColor: Colors.white,
     elevation: 0,
     centerTitle: false,
-    title: const Text(
-      'Patient List',
-      style: TextStyle(
+    title: Text(
+      AppLocalizations.of(context)!.patientList,
+      style: const TextStyle(
           fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
     ),
     leading: null,
@@ -289,7 +291,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
       controller: _searchCtrl,
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
-        hintText: 'Search by name or clinic code…',
+        hintText: AppLocalizations.of(context)!.searchByNameOrCode,
         hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
         prefixIcon: Icon(Icons.search_rounded, color: kP4, size: 20),
         suffixIcon: _query.isNotEmpty
@@ -320,16 +322,21 @@ class _PatientListScreenState extends State<PatientListScreen> {
     padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
     child: SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _chip('All',       _FilterOption.all,    kP3),
-          const SizedBox(width: 8),
-          _chip('High Risk', _FilterOption.high,   const Color(0xFFB91C1C)),
-          const SizedBox(width: 8),
-          _chip('Med Risk',  _FilterOption.medium, const Color(0xFFD97706)),
-          const SizedBox(width: 8),
-          _chip('Low Risk',  _FilterOption.low,    const Color(0xFF16A34A)),
-        ],
+      child: Builder(
+        builder: (context) {
+          final l10n = AppLocalizations.of(context)!;
+          return Row(
+            children: [
+              _chip(l10n.filterAll,   _FilterOption.all,    kP3),
+              const SizedBox(width: 8),
+              _chip(l10n.highRisk,    _FilterOption.high,   const Color(0xFFB91C1C)),
+              const SizedBox(width: 8),
+              _chip(l10n.medRisk,     _FilterOption.medium, const Color(0xFFD97706)),
+              const SizedBox(width: 8),
+              _chip(l10n.lowRisk,     _FilterOption.low,    const Color(0xFF16A34A)),
+            ],
+          );
+        },
       ),
     ),
   );
@@ -359,12 +366,14 @@ class _PatientListScreenState extends State<PatientListScreen> {
   }
 
   // ── List header (count + sort) ───────────────────────────────────────────────
-  Widget _buildListHeader(BuildContext context, int count) => Padding(
+  Widget _buildListHeader(BuildContext context, int count) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
     padding: const EdgeInsets.fromLTRB(16, 14, 12, 4),
     child: Row(
       children: [
         Text(
-          '$count patient${count == 1 ? '' : 's'}',
+          l10n.patientCount(count),
           style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
@@ -377,9 +386,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: kP3.withOpacity(0.08),
+              color: kP3.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: kP3.withOpacity(0.2)),
+              border: Border.all(color: kP3.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
@@ -387,9 +396,9 @@ class _PatientListScreenState extends State<PatientListScreen> {
                 const SizedBox(width: 4),
                 Text(
                   switch (_sort) {
-                    _SortOption.riskLevel  => 'Risk Level',
-                    _SortOption.name       => 'Name',
-                    _SortOption.lastActive => 'Last Active',
+                    _SortOption.riskLevel  => l10n.sortRiskLevel,
+                    _SortOption.name       => l10n.sortName,
+                    _SortOption.lastActive => l10n.sortLastActive,
                   },
                   style: TextStyle(
                       fontSize: 11,
@@ -406,9 +415,11 @@ class _PatientListScreenState extends State<PatientListScreen> {
       ],
     ),
   );
+  }
 
   // ── Patient card ─────────────────────────────────────────────────────────────
   Widget _buildPatientCard(_PatientVM p) {
+    final l10n = AppLocalizations.of(context)!;
     final rc = _riskColor(p.risk);
     final adherenceColor = p.adherence >= 80
         ? const Color(0xFF16A34A)
@@ -423,10 +434,10 @@ class _PatientListScreenState extends State<PatientListScreen> {
         decoration: BoxDecoration(
           color: kCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: rc.withOpacity(0.18), width: 1),
+          border: Border.all(color: rc.withValues(alpha: 0.18), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -458,7 +469,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                         children: [
                           CircleAvatar(
                             radius: 18,
-                            backgroundColor: kP1.withOpacity(0.25),
+                            backgroundColor: kP1.withValues(alpha: 0.25),
                             child: Text(
                               p.firstName[0],
                               style: TextStyle(
@@ -489,13 +500,13 @@ class _PatientListScreenState extends State<PatientListScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 9, vertical: 4),
                             decoration: BoxDecoration(
-                              color: rc.withOpacity(0.1),
+                              color: rc.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                               border:
-                                  Border.all(color: rc.withOpacity(0.4)),
+                                  Border.all(color: rc.withValues(alpha: 0.4)),
                             ),
                             child: Text(
-                              _riskLabel(p.risk),
+                              _riskLabel(p.risk, l10n),
                               style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
@@ -526,7 +537,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                                           color: adherenceColor),
                                     ),
                                     const SizedBox(width: 4),
-                                    Text('adherence (30d)',
+                                    Text(l10n.adherence30d,
                                         style: TextStyle(
                                             fontSize: 10,
                                             color: Colors.grey.shade500)),
@@ -555,7 +566,7 @@ class _PatientListScreenState extends State<PatientListScreen> {
                                   size: 11,
                                   color: Colors.grey.shade400),
                               const SizedBox(height: 2),
-                              Text(p.lastLog,
+                              Text(p.lastLog(l10n),
                                   style: TextStyle(
                                       fontSize: 10,
                                       color: Colors.grey.shade500,
@@ -579,54 +590,57 @@ class _PatientListScreenState extends State<PatientListScreen> {
   }
 
   // ── Empty state ──────────────────────────────────────────────────────────────
-  Widget _buildEmptyState() => Center(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: kP1.withOpacity(0.15),
-              shape: BoxShape.circle,
+  Widget _buildEmptyState() {
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: kP1.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.person_search_rounded, size: 36, color: kP4),
             ),
-            child: Icon(Icons.person_search_rounded, size: 36, color: kP4),
-          ),
-          const SizedBox(height: 16),
-          Text('No patients found',
+            const SizedBox(height: 16),
+            Text(l10n.noPatientsFound,
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: kP2)),
+            const SizedBox(height: 6),
+            Text(
+              l10n.noPatientsFoundSubtitle,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kP2)),
-          const SizedBox(height: 6),
-          Text(
-            'Try adjusting your search or filter, or register a new patient.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 13, color: Colors.grey.shade500, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {
-              context.push('worker/patients');
-            },
-            icon: const Icon(Icons.person_add_rounded, size: 18),
-            label: const Text('Register New Patient'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kP3,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 13),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  fontSize: 13, color: Colors.grey.shade500, height: 1.5),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.push('worker/patients');
+              },
+              icon: const Icon(Icons.person_add_rounded, size: 18),
+              label: Text(l10n.registerNewPatient),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kP3,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

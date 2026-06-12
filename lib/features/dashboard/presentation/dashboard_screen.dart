@@ -1,10 +1,13 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/sync/sync_service.dart';
 import '../../../app/router.dart';
+import '../../../core/database/app_database.dart';
+import '../../../core/security/auth_service.dart';
+import '../../../core/sync/sync_service.dart';
 import '../../../providers/session_provider.dart';
 import '../data/dashboard_repository.dart';
 import '../domain/clinic_stats_model.dart';
@@ -61,6 +64,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) setState(() => _trend = data);
   }
 
+  Future<void> _logout() async {
+    await AuthService.clearSession();
+    if (!mounted) return;
+    context.read<SessionProvider>().signOut();
+    context.go(AppRoutes.login);
+  }
+
   void _triggerSync() {
     setState(() => _syncing = true);
     context.read<SyncService>().sync().then((_) {
@@ -77,12 +87,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  String _formatLastSeen(DateTime? dt) {
-    if (dt == null) return 'Never';
+  String _formatLastSeen(DateTime? dt, AppLocalizations l10n) {
+    if (dt == null) return l10n.never;
     final diff = DateTime.now().difference(dt).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
-    return '$diff days ago';
+    if (diff == 0) return l10n.today;
+    if (diff == 1) return l10n.yesterday;
+    return l10n.daysAgo(diff);
   }
 
   @override
@@ -101,6 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── APP BAR ──────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
+    final l10n = AppLocalizations.of(context)!;
     final session = context.read<SessionProvider>();
     final firstName = (session.workerFullName ?? 'Worker').split(' ').first;
     final clinicLabel = session.workerClinicName ?? 'Clinic Dashboard';
@@ -111,7 +122,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     toolbarHeight: 90,
     automaticallyImplyLeading: false,
     elevation: 2,
-    shadowColor: Colors.black.withOpacity(0.08),
+    shadowColor: Colors.black.withValues(alpha: 0.08),
     title: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -123,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'assets/images/LOGO.png',
               fit: BoxFit.contain,
               height: 44,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_, _, _) => Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
@@ -140,7 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 3),
             Text(
-              'Hi, $firstName',
+              l10n.greeting(firstName),
               style: const TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w800,
@@ -193,8 +204,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: _syncing
-                      ? kBlue1.withOpacity(0.12)
-                      : Colors.green.withOpacity(0.1),
+                      ? kBlue1.withValues(alpha: 0.12)
+                      : Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _syncing ? kBlue1 : Colors.green.shade400,
@@ -214,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             size: 10, color: Colors.green.shade600),
                     const SizedBox(width: 4),
                     Text(
-                      _syncing ? 'Syncing…' : 'Synced $_lastSynced',
+                      _syncing ? l10n.syncing : l10n.syncedAt(_lastSynced),
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
@@ -229,15 +240,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         const Spacer(),
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: kBlue4,
-          child: Text(
-            firstName.isNotEmpty ? firstName[0].toUpperCase() : 'W',
-            style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 14),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'logout') _logout();
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'logout',
+              child: Row(
+                children: [
+                  const Icon(Icons.logout_rounded, size: 18),
+                  const SizedBox(width: 10),
+                  Text(l10n.logout),
+                ],
+              ),
+            ),
+          ],
+          child: CircleAvatar(
+            radius: 18,
+            backgroundColor: kBlue4,
+            child: Text(
+              firstName.isNotEmpty ? firstName[0].toUpperCase() : 'W',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14),
+            ),
           ),
         ),
       ],
@@ -292,6 +320,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── STATS ROW (phone) ────────────────────────────────────────────────────
   Widget _statsRow() {
+    final l10n = AppLocalizations.of(context)!;
     return StreamBuilder<ClinicStats>(
       stream: _statsStream,
       builder: (context, snap) {
@@ -301,7 +330,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: _statCard(
                 '${stats.totalPatients}',
-                'Total Patients',
+                l10n.totalPatients,
                 kBlue4,
                 Colors.white,
                 icon: Icons.people_alt_rounded,
@@ -311,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: _statCard(
                 '${stats.highRisk}',
-                'High Risk',
+                l10n.highRisk,
                 const Color(0xFFB91C1C),
                 Colors.white,
                 icon: Icons.warning_rounded,
@@ -322,7 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Expanded(
               child: _statCard(
                 stats.adherencePercent,
-                'Avg Adherence',
+                l10n.avgAdherence,
                 kBlue2,
                 Colors.white,
                 icon: Icons.trending_up_rounded,
@@ -337,6 +366,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // ── STATS ROW (tablet) ───────────────────────────────────────────────────
   Widget _statsRowTablet() {
+    final l10n = AppLocalizations.of(context)!;
     return StreamBuilder<ClinicStats>(
       stream: _statsStream,
       builder: (context, snap) {
@@ -347,17 +377,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             SizedBox(
                 width: 200,
-                child: _statCard('${stats.totalPatients}', 'Total Patients',
+                child: _statCard('${stats.totalPatients}', l10n.totalPatients,
                     kBlue4, Colors.white,
                     icon: Icons.people_alt_rounded)),
             SizedBox(
                 width: 200,
-                child: _statCard('${stats.highRisk}', 'High Risk',
+                child: _statCard('${stats.highRisk}', l10n.highRisk,
                     const Color(0xFFB91C1C), Colors.white,
                     icon: Icons.warning_rounded, valueColor: Colors.white)),
             SizedBox(
                 width: 200,
-                child: _statCard(stats.adherencePercent, 'Avg Adherence',
+                child: _statCard(stats.adherencePercent, l10n.avgAdherence,
                     kBlue2, Colors.white,
                     icon: Icons.trending_up_rounded,
                     valueColor: const Color(0xFF86EFAC))),
@@ -382,7 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: bg.withOpacity(0.35),
+              color: bg.withValues(alpha: 0.35),
               blurRadius: 12,
               offset: const Offset(0, 5),
             ),
@@ -391,7 +421,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: Colors.white.withOpacity(0.7), size: 18),
+            Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 18),
             const SizedBox(height: 8),
             Text(value,
                 style: TextStyle(
@@ -403,69 +433,73 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: labelColor.withOpacity(0.85))),
+                    color: labelColor.withValues(alpha: 0.85))),
           ],
         ),
       );
 
   // ── ACTION REQUIRED ──────────────────────────────────────────────────────
-  Widget _actionRequired() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: Colors.red.shade600,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Text('Action Required',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1A1A2E))),
-          const Spacer(),
-          GestureDetector(
-            onTap: () {},
-            child: Text('View all',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: kBlue3,
-                    fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      StreamBuilder<List<Patient>>(
-        stream: _highRiskStream,
-        builder: (context, snap) {
-          final patients = snap.data ?? [];
-          if (patients.isEmpty) {
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              alignment: Alignment.center,
-              child: Text(
-                'No high-risk patients — great work!',
-                style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic),
+  Widget _actionRequired() {
+    final l10n = AppLocalizations.of(context)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: Colors.red.shade600,
+                borderRadius: BorderRadius.circular(2),
               ),
+            ),
+            const SizedBox(width: 8),
+            Text(l10n.actionRequired,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1A1A2E))),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => context.go(AppRoutes.patientList),
+              child: Text(l10n.viewAll,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: kBlue3,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<List<Patient>>(
+          stream: _highRiskStream,
+          builder: (context, snap) {
+            final patients = snap.data ?? [];
+            if (patients.isEmpty) {
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                alignment: Alignment.center,
+                child: Text(
+                  l10n.noHighRiskPatients,
+                  style: TextStyle(
+                      color: Colors.grey.shade500,
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic),
+                ),
+              );
+            }
+            return Column(
+              children: patients.take(5).map(_patientCard).toList(),
             );
-          }
-          return Column(
-            children: patients.take(5).map(_patientCard).toList(),
-          );
-        },
-      ),
-    ],
-  );
+          },
+        ),
+      ],
+    );
+  }
 
   Widget _patientCard(Patient p) {
+    final l10n = AppLocalizations.of(context)!;
     final score = p.riskScore ?? 0;
     final riskColor = score >= 80
         ? Colors.red.shade600
@@ -482,18 +516,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
         ],
-        border: Border.all(color: riskColor.withOpacity(0.15), width: 1),
+        border: Border.all(color: riskColor.withValues(alpha: 0.15), width: 1),
       ),
       child: Row(
         children: [
           CircleAvatar(
             radius: 20,
-            backgroundColor: kBlue4.withOpacity(0.12),
+            backgroundColor: kBlue4.withValues(alpha: 0.12),
             child: Text(
               p.fullName.split(' ').map((e) => e[0]).take(2).join(),
               style: const TextStyle(
@@ -514,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         color: Color(0xFF1A1A2E))),
                 const SizedBox(height: 2),
                 Text(
-                  'Last seen: ${_formatLastSeen(p.lastAdherenceLogAt)}',
+                  l10n.lastSeen(_formatLastSeen(p.lastAdherenceLogAt, l10n)),
                   style: TextStyle(
                       fontSize: 11, color: Colors.grey.shade500),
                 ),
@@ -526,11 +560,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: riskColor.withOpacity(0.12),
+              color: riskColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: riskColor.withOpacity(0.4)),
+              border: Border.all(color: riskColor.withValues(alpha: 0.4)),
             ),
-            child: Text('Risk $score%',
+            child: Text(l10n.riskBadge(score.toString()),
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -545,7 +579,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF1A1A2E))),
-              Text('adherence',
+              Text(l10n.adherence,
                   style: TextStyle(
                       fontSize: 10, color: Colors.grey.shade500)),
             ],
@@ -556,77 +590,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ── ADHERENCE TREND CHART ─────────────────────────────────────────────────
-  Widget _adherenceTrend() => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: kCard,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.05),
-          blurRadius: 12,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 4,
-              height: 18,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [kBlue1, kBlue3],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Text('Clinic Adherence Trend',
-                style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1A1A2E))),
-            const Spacer(),
-            Text('30 days',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500)),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text('Clinic-wide medication adherence %',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 150,
-          child: _trend.isEmpty
-              ? Center(
-                  child: Text('Loading trend…',
-                      style: TextStyle(
-                          color: Colors.grey.shade400, fontSize: 12)))
-              : CustomPaint(
-                  painter: _TrendPainter(_trend),
-                  size: Size.infinite,
+  Widget _adherenceTrend() {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [kBlue1, kBlue3],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: ['Day 1', 'Day 10', 'Day 20', 'Today']
-              .map((l) => Text(l,
+              ),
+              const SizedBox(width: 8),
+              Text(l10n.clinicAdherenceTrend,
+                  style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1A1A2E))),
+              const Spacer(),
+              Text(l10n.thirtyDays,
                   style: TextStyle(
-                      fontSize: 10, color: Colors.grey.shade400)))
-              .toList(),
-        ),
-      ],
-    ),
-  );
+                      fontSize: 12,
+                      color: Colors.grey.shade500,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(l10n.clinicWideAdherence,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 150,
+            child: _trend.isEmpty
+                ? Center(
+                    child: Text(l10n.loadingTrend,
+                        style: TextStyle(
+                            color: Colors.grey.shade400, fontSize: 12)))
+                : CustomPaint(
+                    painter: _TrendPainter(_trend),
+                    size: Size.infinite,
+                  ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: ['Day 1', 'Day 10', 'Day 20', l10n.today]
+                .map((label) => Text(label,
+                    style: TextStyle(
+                        fontSize: 10, color: Colors.grey.shade400)))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── SIDEBAR NAV (tablet) ──────────────────────────────────────────────────
   Widget _sideNav() => Container(
@@ -644,7 +681,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.medical_services_rounded,
@@ -667,11 +704,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   );
 
   List<Widget> _navItems() {
+    final l10n = AppLocalizations.of(context)!;
     final items = [
-      (Icons.dashboard_rounded, 'Dashboard'),
-      (Icons.people_alt_rounded, 'Patients'),
-      (Icons.bar_chart_rounded, 'Reports'),
-      (Icons.settings_rounded, 'Settings'),
+      (Icons.dashboard_rounded, l10n.navDashboard),
+      (Icons.people_alt_rounded, l10n.navPatients),
+      (Icons.bar_chart_rounded, l10n.navReports),
+      (Icons.settings_rounded, l10n.navSettings),
     ];
     return List.generate(items.length, (i) {
       final active = i == _navIndex;
@@ -682,7 +720,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: active
-                ? Colors.white.withOpacity(0.15)
+                ? Colors.white.withValues(alpha: 0.15)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -741,7 +779,7 @@ class _TrendPainter extends CustomPainter {
       fillPath,
       Paint()
         ..shader = LinearGradient(
-          colors: [kBlue1.withOpacity(0.28), kBlue1.withOpacity(0.02)],
+          colors: [kBlue1.withValues(alpha: 0.28), kBlue1.withValues(alpha: 0.02)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
@@ -770,7 +808,7 @@ class _TrendPainter extends CustomPainter {
         Paint()..color = Colors.white);
 
     final refPaint = Paint()
-      ..color = Colors.grey.withOpacity(0.12)
+      ..color = Colors.grey.withValues(alpha: 0.12)
       ..strokeWidth = 1;
     for (final pct in [0.25, 0.5, 0.75]) {
       final y = size.height * pct;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/router.dart';
@@ -42,16 +43,17 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
   }
 
   Future<void> _register() async {
+    final l10n = AppLocalizations.of(context)!;
     // Validate text fields
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     // Validate PINs
     if (_pin.length < 4) {
-      setState(() => _pinError = 'Please enter a 4-digit PIN.');
+      setState(() => _pinError = l10n.pinTooShort);
       return;
     }
     if (_pin != _confirmPin) {
-      setState(() => _pinError = 'PINs do not match. Please try again.');
+      setState(() => _pinError = l10n.pinMismatch);
       return;
     }
     setState(() {
@@ -97,6 +99,7 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: _kBg,
       appBar: AppBar(
@@ -107,9 +110,9 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           onPressed: () => context.pop(),
         ),
-        title: const Text(
-          'Register as Worker',
-          style: TextStyle(
+        title: Text(
+          l10n.registerWorkerTitle,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -134,7 +137,7 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
               const Center(child: MedAdhereHeader()),
               const SizedBox(height: 24),
 
-              _sectionLabel('Staff Details'),
+              _sectionLabel(l10n.staffDetails),
               const SizedBox(height: 12),
 
               Form(
@@ -144,30 +147,30 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
                   children: [
                     _textField(
                       controller: _fullNameCtrl,
-                      label: 'Full Name *',
+                      label: l10n.fullNameLabel,
                       hint: 'e.g. Dr. Nomsa Dlamini',
                       icon: Icons.person_rounded,
                       capitalization: TextCapitalization.words,
                       validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Full name is required'
+                          ? l10n.fullNameRequired
                           : null,
                     ),
                     const SizedBox(height: 14),
 
                     _textField(
                       controller: _staffNumberCtrl,
-                      label: 'Staff Number *',
+                      label: l10n.staffNumberLabel,
                       hint: 'e.g. STF-00123',
                       icon: Icons.badge_rounded,
                       validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Staff number is required'
+                          ? l10n.staffNumberRequired
                           : null,
                     ),
                     const SizedBox(height: 14),
 
                     _textField(
                       controller: _clinicNameCtrl,
-                      label: 'Clinic Name (optional)',
+                      label: l10n.clinicNameOptional,
                       hint: 'e.g. Soweto Community Clinic',
                       icon: Icons.local_hospital_rounded,
                     ),
@@ -176,15 +179,15 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
               ),
 
               const SizedBox(height: 28),
-              _sectionLabel('Set Your PIN'),
+              _sectionLabel(l10n.setYourPin),
               const SizedBox(height: 4),
               Text(
-                'Choose a 4-digit PIN you will use to log in.',
+                l10n.pinSubtitle,
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
               ),
               const SizedBox(height: 16),
 
-              _fieldLabel('PIN'),
+              _fieldLabel(l10n.pinLabel),
               const SizedBox(height: 10),
               PinInputRow(
                 length: 4,
@@ -194,7 +197,7 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
               ),
 
               const SizedBox(height: 20),
-              _fieldLabel('Confirm PIN'),
+              _fieldLabel(l10n.confirmPinField),
               const SizedBox(height: 10),
               PinInputRow(
                 length: 4,
@@ -220,7 +223,7 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kP3,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: _kP3.withOpacity(0.6),
+                    disabledBackgroundColor: _kP3.withValues(alpha: 0.6),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -240,12 +243,12 @@ class _RegisterWorkerScreenState extends State<RegisterWorkerScreen> {
                             color: Colors.white,
                           ),
                         )
-                      : const Row(
+                      : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.how_to_reg_rounded, size: 20),
-                            SizedBox(width: 10),
-                            Text('Register & Sign In'),
+                            const Icon(Icons.how_to_reg_rounded, size: 20),
+                            const SizedBox(width: 10),
+                            Text(l10n.registerSignIn),
                           ],
                         ),
                 ),

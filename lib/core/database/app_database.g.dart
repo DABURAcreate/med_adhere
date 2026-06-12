@@ -112,6 +112,17 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _caregiverRelationshipMeta =
+      const VerificationMeta('caregiverRelationship');
+  @override
+  late final GeneratedColumn<String> caregiverRelationship =
+      GeneratedColumn<String>(
+        'caregiver_relationship',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _riskLevelMeta = const VerificationMeta(
     'riskLevel',
   );
@@ -288,6 +299,7 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
     language,
     pinHash,
     caregiverPhone,
+    caregiverRelationship,
     riskLevel,
     activationCode,
     isActivated,
@@ -387,6 +399,15 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         caregiverPhone.isAcceptableOrUnknown(
           data['caregiver_phone']!,
           _caregiverPhoneMeta,
+        ),
+      );
+    }
+    if (data.containsKey('caregiver_relationship')) {
+      context.handle(
+        _caregiverRelationshipMeta,
+        caregiverRelationship.isAcceptableOrUnknown(
+          data['caregiver_relationship']!,
+          _caregiverRelationshipMeta,
         ),
       );
     }
@@ -540,6 +561,10 @@ class $PatientsTable extends Patients with TableInfo<$PatientsTable, Patient> {
         DriftSqlType.string,
         data['${effectivePrefix}caregiver_phone'],
       ),
+      caregiverRelationship: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}caregiver_relationship'],
+      ),
       riskLevel: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}risk_level'],
@@ -615,6 +640,7 @@ class Patient extends DataClass implements Insertable<Patient> {
   final String language;
   final String pinHash;
   final String? caregiverPhone;
+  final String? caregiverRelationship;
   final String riskLevel;
   final String? activationCode;
   final bool isActivated;
@@ -639,6 +665,7 @@ class Patient extends DataClass implements Insertable<Patient> {
     required this.language,
     required this.pinHash,
     this.caregiverPhone,
+    this.caregiverRelationship,
     required this.riskLevel,
     this.activationCode,
     required this.isActivated,
@@ -667,6 +694,9 @@ class Patient extends DataClass implements Insertable<Patient> {
     map['pin_hash'] = Variable<String>(pinHash);
     if (!nullToAbsent || caregiverPhone != null) {
       map['caregiver_phone'] = Variable<String>(caregiverPhone);
+    }
+    if (!nullToAbsent || caregiverRelationship != null) {
+      map['caregiver_relationship'] = Variable<String>(caregiverRelationship);
     }
     map['risk_level'] = Variable<String>(riskLevel);
     if (!nullToAbsent || activationCode != null) {
@@ -718,6 +748,9 @@ class Patient extends DataClass implements Insertable<Patient> {
       caregiverPhone: caregiverPhone == null && nullToAbsent
           ? const Value.absent()
           : Value(caregiverPhone),
+      caregiverRelationship: caregiverRelationship == null && nullToAbsent
+          ? const Value.absent()
+          : Value(caregiverRelationship),
       riskLevel: Value(riskLevel),
       activationCode: activationCode == null && nullToAbsent
           ? const Value.absent()
@@ -769,6 +802,9 @@ class Patient extends DataClass implements Insertable<Patient> {
       language: serializer.fromJson<String>(json['language']),
       pinHash: serializer.fromJson<String>(json['pinHash']),
       caregiverPhone: serializer.fromJson<String?>(json['caregiverPhone']),
+      caregiverRelationship: serializer.fromJson<String?>(
+        json['caregiverRelationship'],
+      ),
       riskLevel: serializer.fromJson<String>(json['riskLevel']),
       activationCode: serializer.fromJson<String?>(json['activationCode']),
       isActivated: serializer.fromJson<bool>(json['isActivated']),
@@ -802,6 +838,9 @@ class Patient extends DataClass implements Insertable<Patient> {
       'language': serializer.toJson<String>(language),
       'pinHash': serializer.toJson<String>(pinHash),
       'caregiverPhone': serializer.toJson<String?>(caregiverPhone),
+      'caregiverRelationship': serializer.toJson<String?>(
+        caregiverRelationship,
+      ),
       'riskLevel': serializer.toJson<String>(riskLevel),
       'activationCode': serializer.toJson<String?>(activationCode),
       'isActivated': serializer.toJson<bool>(isActivated),
@@ -831,6 +870,7 @@ class Patient extends DataClass implements Insertable<Patient> {
     String? language,
     String? pinHash,
     Value<String?> caregiverPhone = const Value.absent(),
+    Value<String?> caregiverRelationship = const Value.absent(),
     String? riskLevel,
     Value<String?> activationCode = const Value.absent(),
     bool? isActivated,
@@ -857,6 +897,9 @@ class Patient extends DataClass implements Insertable<Patient> {
     caregiverPhone: caregiverPhone.present
         ? caregiverPhone.value
         : this.caregiverPhone,
+    caregiverRelationship: caregiverRelationship.present
+        ? caregiverRelationship.value
+        : this.caregiverRelationship,
     riskLevel: riskLevel ?? this.riskLevel,
     activationCode: activationCode.present
         ? activationCode.value
@@ -901,6 +944,9 @@ class Patient extends DataClass implements Insertable<Patient> {
       caregiverPhone: data.caregiverPhone.present
           ? data.caregiverPhone.value
           : this.caregiverPhone,
+      caregiverRelationship: data.caregiverRelationship.present
+          ? data.caregiverRelationship.value
+          : this.caregiverRelationship,
       riskLevel: data.riskLevel.present ? data.riskLevel.value : this.riskLevel,
       activationCode: data.activationCode.present
           ? data.activationCode.value
@@ -948,6 +994,7 @@ class Patient extends DataClass implements Insertable<Patient> {
           ..write('language: $language, ')
           ..write('pinHash: $pinHash, ')
           ..write('caregiverPhone: $caregiverPhone, ')
+          ..write('caregiverRelationship: $caregiverRelationship, ')
           ..write('riskLevel: $riskLevel, ')
           ..write('activationCode: $activationCode, ')
           ..write('isActivated: $isActivated, ')
@@ -977,6 +1024,7 @@ class Patient extends DataClass implements Insertable<Patient> {
     language,
     pinHash,
     caregiverPhone,
+    caregiverRelationship,
     riskLevel,
     activationCode,
     isActivated,
@@ -1005,6 +1053,7 @@ class Patient extends DataClass implements Insertable<Patient> {
           other.language == this.language &&
           other.pinHash == this.pinHash &&
           other.caregiverPhone == this.caregiverPhone &&
+          other.caregiverRelationship == this.caregiverRelationship &&
           other.riskLevel == this.riskLevel &&
           other.activationCode == this.activationCode &&
           other.isActivated == this.isActivated &&
@@ -1031,6 +1080,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
   final Value<String> language;
   final Value<String> pinHash;
   final Value<String?> caregiverPhone;
+  final Value<String?> caregiverRelationship;
   final Value<String> riskLevel;
   final Value<String?> activationCode;
   final Value<bool> isActivated;
@@ -1055,6 +1105,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     this.language = const Value.absent(),
     this.pinHash = const Value.absent(),
     this.caregiverPhone = const Value.absent(),
+    this.caregiverRelationship = const Value.absent(),
     this.riskLevel = const Value.absent(),
     this.activationCode = const Value.absent(),
     this.isActivated = const Value.absent(),
@@ -1080,6 +1131,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     this.language = const Value.absent(),
     required String pinHash,
     this.caregiverPhone = const Value.absent(),
+    this.caregiverRelationship = const Value.absent(),
     this.riskLevel = const Value.absent(),
     this.activationCode = const Value.absent(),
     this.isActivated = const Value.absent(),
@@ -1110,6 +1162,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Expression<String>? language,
     Expression<String>? pinHash,
     Expression<String>? caregiverPhone,
+    Expression<String>? caregiverRelationship,
     Expression<String>? riskLevel,
     Expression<String>? activationCode,
     Expression<bool>? isActivated,
@@ -1135,6 +1188,8 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       if (language != null) 'language': language,
       if (pinHash != null) 'pin_hash': pinHash,
       if (caregiverPhone != null) 'caregiver_phone': caregiverPhone,
+      if (caregiverRelationship != null)
+        'caregiver_relationship': caregiverRelationship,
       if (riskLevel != null) 'risk_level': riskLevel,
       if (activationCode != null) 'activation_code': activationCode,
       if (isActivated != null) 'is_activated': isActivated,
@@ -1164,6 +1219,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     Value<String>? language,
     Value<String>? pinHash,
     Value<String?>? caregiverPhone,
+    Value<String?>? caregiverRelationship,
     Value<String>? riskLevel,
     Value<String?>? activationCode,
     Value<bool>? isActivated,
@@ -1189,6 +1245,8 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
       language: language ?? this.language,
       pinHash: pinHash ?? this.pinHash,
       caregiverPhone: caregiverPhone ?? this.caregiverPhone,
+      caregiverRelationship:
+          caregiverRelationship ?? this.caregiverRelationship,
       riskLevel: riskLevel ?? this.riskLevel,
       activationCode: activationCode ?? this.activationCode,
       isActivated: isActivated ?? this.isActivated,
@@ -1236,6 +1294,11 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
     }
     if (caregiverPhone.present) {
       map['caregiver_phone'] = Variable<String>(caregiverPhone.value);
+    }
+    if (caregiverRelationship.present) {
+      map['caregiver_relationship'] = Variable<String>(
+        caregiverRelationship.value,
+      );
     }
     if (riskLevel.present) {
       map['risk_level'] = Variable<String>(riskLevel.value);
@@ -1298,6 +1361,7 @@ class PatientsCompanion extends UpdateCompanion<Patient> {
           ..write('language: $language, ')
           ..write('pinHash: $pinHash, ')
           ..write('caregiverPhone: $caregiverPhone, ')
+          ..write('caregiverRelationship: $caregiverRelationship, ')
           ..write('riskLevel: $riskLevel, ')
           ..write('activationCode: $activationCode, ')
           ..write('isActivated: $isActivated, ')
@@ -3829,6 +3893,7 @@ typedef $$PatientsTableCreateCompanionBuilder =
       Value<String> language,
       required String pinHash,
       Value<String?> caregiverPhone,
+      Value<String?> caregiverRelationship,
       Value<String> riskLevel,
       Value<String?> activationCode,
       Value<bool> isActivated,
@@ -3855,6 +3920,7 @@ typedef $$PatientsTableUpdateCompanionBuilder =
       Value<String> language,
       Value<String> pinHash,
       Value<String?> caregiverPhone,
+      Value<String?> caregiverRelationship,
       Value<String> riskLevel,
       Value<String?> activationCode,
       Value<bool> isActivated,
@@ -3981,6 +4047,11 @@ class $$PatientsTableFilterComposer
 
   ColumnFilters<String> get caregiverPhone => $composableBuilder(
     column: $table.caregiverPhone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get caregiverRelationship => $composableBuilder(
+    column: $table.caregiverRelationship,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4184,6 +4255,11 @@ class $$PatientsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get caregiverRelationship => $composableBuilder(
+    column: $table.caregiverRelationship,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get riskLevel => $composableBuilder(
     column: $table.riskLevel,
     builder: (column) => ColumnOrderings(column),
@@ -4296,6 +4372,11 @@ class $$PatientsTableAnnotationComposer
 
   GeneratedColumn<String> get caregiverPhone => $composableBuilder(
     column: $table.caregiverPhone,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get caregiverRelationship => $composableBuilder(
+    column: $table.caregiverRelationship,
     builder: (column) => column,
   );
 
@@ -4476,6 +4557,7 @@ class $$PatientsTableTableManager
                 Value<String> language = const Value.absent(),
                 Value<String> pinHash = const Value.absent(),
                 Value<String?> caregiverPhone = const Value.absent(),
+                Value<String?> caregiverRelationship = const Value.absent(),
                 Value<String> riskLevel = const Value.absent(),
                 Value<String?> activationCode = const Value.absent(),
                 Value<bool> isActivated = const Value.absent(),
@@ -4500,6 +4582,7 @@ class $$PatientsTableTableManager
                 language: language,
                 pinHash: pinHash,
                 caregiverPhone: caregiverPhone,
+                caregiverRelationship: caregiverRelationship,
                 riskLevel: riskLevel,
                 activationCode: activationCode,
                 isActivated: isActivated,
@@ -4526,6 +4609,7 @@ class $$PatientsTableTableManager
                 Value<String> language = const Value.absent(),
                 required String pinHash,
                 Value<String?> caregiverPhone = const Value.absent(),
+                Value<String?> caregiverRelationship = const Value.absent(),
                 Value<String> riskLevel = const Value.absent(),
                 Value<String?> activationCode = const Value.absent(),
                 Value<bool> isActivated = const Value.absent(),
@@ -4550,6 +4634,7 @@ class $$PatientsTableTableManager
                 language: language,
                 pinHash: pinHash,
                 caregiverPhone: caregiverPhone,
+                caregiverRelationship: caregiverRelationship,
                 riskLevel: riskLevel,
                 activationCode: activationCode,
                 isActivated: isActivated,

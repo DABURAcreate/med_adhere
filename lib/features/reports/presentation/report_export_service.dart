@@ -69,7 +69,6 @@ class ReportExportService {
   // Colour constants (matching the app palette for the PDF header)
   static const _navy = PdfColor.fromInt(0xFF114C90);
   static const _teal = PdfColor.fromInt(0xFF1A7E95);
-  static const _lightBlue = PdfColor.fromInt(0xFFF0F5FB);
   static const _danger = PdfColor.fromInt(0xFFB91C1C);
   static const _success = PdfColor.fromInt(0xFF16A34A);
   static const _warning = PdfColor.fromInt(0xFFD97706);
@@ -107,6 +106,7 @@ class ReportExportService {
         file = await _buildCsv(config);
       }
 
+      if (!context.mounted) return;
       await _share(file, config, context);
     } catch (e, stack) {
       debugPrint('ReportExportService error: $e\n$stack');
@@ -427,7 +427,7 @@ class ReportExportService {
         : 'clinic';
     final start = fmt.format(config.startDate);
     final end = fmt.format(config.endDate);
-    return 'medadhere_${scope}_${start}_${end}.$ext';
+    return 'medadhere_${scope}_${start}_$end.$ext';
   }
 
   // ── Share ───────────────────────────────────────────────────────────────

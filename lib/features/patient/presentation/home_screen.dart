@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:mzansi_meds_reminder/l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 
 import '../../../providers/session_provider.dart';
@@ -15,15 +16,16 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final patientId = context.watch<SessionProvider>().currentPatientId;
+    final l10n = AppLocalizations.of(context)!;
 
     if (patientId == null) {
-      return const Scaffold(
-        body: Center(child: Text('No patient session found. Please log in again.')),
+      return Scaffold(
+        body: Center(child: Text(l10n.noPatientSession)),
       );
     }
 
     return MainScaffold(
-      title: "Today's Doses",
+      title: l10n.todaysDoses,
       currentIndex: 0,
       body: StreamBuilder(
         stream: context.read<PatientRepository>().watchPatient(patientId),
@@ -34,8 +36,8 @@ class HomeScreen extends StatelessWidget {
 
           final patient = patientSnap.data;
           if (patient == null) {
-            return const Center(
-              child: Text('Patient not found. Please log in again.'),
+            return Center(
+              child: Text(l10n.patientNotFound),
             );
           }
 
@@ -63,7 +65,7 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       // ── Greeting ──────────────────────────────────────────
                       Text(
-                        'Hi, ${patient.fullName} 👋',
+                        l10n.greetingHi(patient.fullName),
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -88,8 +90,8 @@ class HomeScreen extends StatelessWidget {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Text(
-                            'Today progress:',
+                          Text(
+                            l10n.todayProgress,
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -142,19 +144,19 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             _CountBadge(
                               count: taken,
-                              label: 'Taken',
+                              label: l10n.taken,
                               color: const Color(0xFF4CAF50),
                             ),
                             const SizedBox(width: 10),
                             _CountBadge(
                               count: missed,
-                              label: 'Missed',
+                              label: l10n.missed,
                               color: const Color(0xFFFF0000),
                             ),
                             const SizedBox(width: 10),
                             _CountBadge(
                               count: pending,
-                              label: 'Pending',
+                              label: l10n.pending,
                               color: const Color(0xFFFFC107),
                             ),
                           ],
@@ -165,10 +167,10 @@ class HomeScreen extends StatelessWidget {
                       // ── Dose list ─────────────────────────────────────────
                       Expanded(
                         child: doses.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
-                                  'No active medications found.',
-                                  style: TextStyle(
+                                  l10n.noActiveMedications,
+                                  style: const TextStyle(
                                     fontSize: 15,
                                     color: Colors.grey,
                                   ),
@@ -176,7 +178,7 @@ class HomeScreen extends StatelessWidget {
                               )
                             : ListView.separated(
                                 itemCount: doses.length,
-                                separatorBuilder: (_, __) =>
+                                separatorBuilder: (_, _) =>
                                     const SizedBox(height: 14),
                                 itemBuilder: (context, index) {
                                   final dose = doses[index];
@@ -184,6 +186,7 @@ class HomeScreen extends StatelessWidget {
                                     medicationName: dose.medicationName,
                                     doseTime: dose.doseTime,
                                     status: dose.status,
+                                    scheduledAt: dose.scheduledAt,
                                     loggedAt: dose.loggedAt,
                                     onTaken: dose.isLocked
                                         ? null
